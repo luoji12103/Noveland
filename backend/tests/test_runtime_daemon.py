@@ -33,6 +33,7 @@ from noveland.invocations.models import (
     PromptSnapshot,
     PromptTemplate,
 )
+from noveland.media.models import MediaJob
 from noveland.memory.models import (
     AgentMemoryItem,
     AgentProfileSnapshotModel,
@@ -43,6 +44,20 @@ from noveland.memory.models import (
 )
 from noveland.narrative.models import NarrativeArtifact
 from noveland.observability.models import RuntimeDiagnosticEvent
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderCapabilityCreate,
+    ProviderIntegrationCreate,
+    ProviderKind,
+    ProviderScopeKind,
+)
+from noveland.providers.models import (
+    ProviderBudgetPolicy,
+    ProviderCapability,
+    ProviderHealthCheck,
+    ProviderIntegration,
+)
+from noveland.providers.registry import ProviderRegistryService
 from noveland.services.runtime.agent_loop import AgentRuntimeOrchestrator
 from noveland.services.runtime.daemon import RuntimeDaemon
 from noveland.worlds.clock_service import WorldClockService
@@ -269,6 +284,145 @@ def test_run_agent_scopes_run_events_and_memory_jobs_to_fork_worldline(
     assert job_worldline_id == fork_id
 
 
+def test_run_agent_uses_provider_execution_service_provider_integration(tmp_path: Path) -> None:
+    database_path = tmp_path / "runtime-provider-integration.sqlite3"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    engine = create_engine(database_url)
+    _create_tables(engine)
+
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id, "runtime-provider-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key="runtime-text-provider",
+                display_name="Runtime Text Provider",
+                capabilities=(
+                    ProviderCapabilityCreate(
+                        capability_key="text.generate",
+                        capability_json={"value": True},
+                    ),
+                ),
+            )
+        )
+        provider_id = provider.id
+        session.commit()
+
+    settings = AppSettings.model_construct(
+        environment="local",
+        database_url=database_url,
+        nats_url="nats://localhost:4222",
+        object_storage_root=tmp_path / "object-storage",
+    )
+    with Session(engine) as session:
+        profile_service = ProviderProfileService(session, settings)
+        run = AgentRuntimeOrchestrator(session, profile_service, settings).run_agent(
+            world_id=world_id,
+            agent_id=agent_id,
+            prompt_text="Use the provider integration.",
+            trigger_source="manual",
+            provider_profile_id=provider_id,
+            create_memory=False,
+            retrieve_memory=False,
+            create_narrative_artifact=False,
+        )
+        invocation = session.scalars(select(ModelInvocation)).one()
+        invocation_link = session.scalars(select(AgentRuntimeRunModelInvocation)).one_or_none()
+
+    assert run.status == "succeeded"
+    assert run.provider_profile_id is None
+    assert run.response_text is not None
+    assert run.response_text.startswith("fake text: Use the provider integration.")
+    assert "Agent: guide" in run.response_text
+    assert run.diagnostics["provider_integration_id"] == str(provider_id)
+    assert invocation.invocation_kind == "agent_runtime"
+    assert invocation.provider_profile_id is None
+    assert invocation.request_params_json is not None
+    assert invocation.request_params_json["provider_id"] == str(provider_id)
+    assert invocation_link is not None
+    assert invocation_link.model_invocation_id == invocation.id
+
+
+def test_run_agent_prefers_provider_execution_default_over_legacy_profile(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "runtime-default-provider-integration.sqlite3"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    engine = create_engine(database_url)
+    _create_tables(engine)
+
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id, "runtime-default-provider-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _seed_provider_profile(engine, "legacy-runtime-profile", "legacy-ref")
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key="default-runtime-text-provider",
+                display_name="Default Runtime Text Provider",
+                capabilities=(
+                    ProviderCapabilityCreate(
+                        capability_key="text.generate",
+                        capability_json={"value": True},
+                    ),
+                ),
+            )
+        )
+        provider_id = provider.id
+        session.commit()
+
+    def fail_legacy_invoke(
+        self: ProviderProfileService,
+        profile: object,
+        prompt: str,
+    ) -> ProviderCompletion:
+        del self, profile, prompt
+        raise AssertionError("legacy provider profile execution should not be used")
+
+    monkeypatch.setattr(ProviderProfileService, "invoke_profile", fail_legacy_invoke)
+
+    settings = AppSettings.model_construct(
+        environment="local",
+        database_url=database_url,
+        nats_url="nats://localhost:4222",
+        object_storage_root=tmp_path / "object-storage",
+    )
+    with Session(engine) as session:
+        profile_service = ProviderProfileService(session, settings)
+        run = AgentRuntimeOrchestrator(session, profile_service, settings).run_agent(
+            world_id=world_id,
+            agent_id=agent_id,
+            prompt_text="Use the default provider integration.",
+            trigger_source="manual",
+            provider_profile_id=None,
+            create_memory=False,
+            retrieve_memory=False,
+            create_narrative_artifact=False,
+        )
+        invocation = session.scalars(select(ModelInvocation)).one()
+
+    assert run.status == "succeeded"
+    assert run.provider_profile_id is None
+    assert run.response_text is not None
+    assert run.response_text.startswith("fake text: Use the default provider integration.")
+    assert run.diagnostics["provider_integration_id"] == str(provider_id)
+    assert invocation.provider_profile_id is None
+    assert invocation.request_params_json is not None
+    assert invocation.request_params_json["provider_id"] == str(provider_id)
+
+
 def test_run_agent_living_context_filters_hidden_secrets_by_holder(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -464,6 +618,10 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldClockStateModel.__table__),
         cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, ProviderProfile.__table__),
+        cast(Table, ProviderIntegration.__table__),
+        cast(Table, ProviderCapability.__table__),
+        cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, Agent.__table__),
         cast(Table, WorldBible.__table__),
         cast(Table, AgentRelationshipEdge.__table__),
@@ -497,6 +655,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, PromptSnapshot.__table__),
         cast(Table, AgentRuntimeRunModelInvocation.__table__),
         cast(Table, ModelInvocationTag.__table__),
+        cast(Table, MediaJob.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, MemoryWriteJob.__table__),
         cast(Table, MemoryWriteLog.__table__),

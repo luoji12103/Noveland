@@ -2441,7 +2441,14 @@ class NarrativeQualityService:
             raise NarrativeQualityValidationError(
                 f"{source} requires provider_kind=text_generation"
             )
-        if provider.adapter_kind not in {ProviderAdapterKind.FAKE, ProviderAdapterKind.LOCAL_STUB}:
+        if provider.adapter_kind not in {
+            ProviderAdapterKind.FAKE,
+            ProviderAdapterKind.LOCAL_STUB,
+            ProviderAdapterKind.OPENAI,
+            ProviderAdapterKind.OPENAI_COMPATIBLE,
+            ProviderAdapterKind.ANTHROPIC,
+            ProviderAdapterKind.ANTHROPIC_COMPATIBLE,
+        }:
             raise NarrativeQualityValidationError(
                 "provider adapter does not support provider-kernel text generation yet"
             )

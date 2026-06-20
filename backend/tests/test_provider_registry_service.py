@@ -111,6 +111,37 @@ def test_provider_registry_create_list_update_resolve_and_health() -> None:
     assert health.provider_integration_id == world_provider.id
 
 
+def test_provider_registry_resolves_equivalent_capability_keys() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_TO_SPEECH,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key="template-tts",
+                display_name="Template TTS",
+                capabilities=(
+                    ProviderCapabilityCreate(
+                        capability_key="speech.tts",
+                        capability_json={"value": True},
+                    ),
+                ),
+            )
+        )
+
+        resolved = ProviderRegistryService(session).resolve_provider_for_capability(
+            world_id,
+            provider_kind=ProviderKind.TEXT_TO_SPEECH,
+            capability_key="supports_tts",
+        )
+
+    assert resolved.id == provider.id
+
+
 def test_provider_health_error_text_redacts_sensitive_values() -> None:
     engine = _engine()
     world_id = _seed_world(engine)

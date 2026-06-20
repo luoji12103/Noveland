@@ -18,6 +18,7 @@ from noveland.providers.contracts import (
 from noveland.providers.models import ProviderCapability, ProviderIntegration
 from noveland.providers.routing import (
     ProviderRoutingError,
+    equivalent_capability_keys,
     validate_provider_adapter_compatibility,
 )
 from noveland.providers.secrets import (
@@ -226,7 +227,9 @@ class ProviderRegistryService:
                 select(ProviderCapability.id)
                 .where(
                     ProviderCapability.provider_integration_id == ProviderIntegration.id,
-                    ProviderCapability.capability_key == capability_key,
+                    ProviderCapability.capability_key.in_(
+                        equivalent_capability_keys(capability_key),
+                    ),
                 )
                 .exists()
             )

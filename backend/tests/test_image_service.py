@@ -32,6 +32,7 @@ from noveland.media.contracts import (
 from noveland.media.errors import MediaValidationError
 from noveland.media.image_contracts import (
     ImageComposeRequest,
+    ImageEditRequest,
     ImageGenerateRequest,
     ImageLayer,
     TransparentBackgroundPreference,
@@ -121,6 +122,82 @@ def test_image_generate_fake_provider_writes_job_invocation_asset_and_object(
         assert result.output_objects[0].mime_type == "image/png"
         assert event is not None
         assert event.payload == {"kind": "seed"}
+
+
+def test_image_generate_accepts_template_capability_key(tmp_path: Path) -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world_graph(engine)
+    storage = LocalMediaObjectStorage(tmp_path)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(
+            session,
+            world_id,
+            ProviderKind.IMAGE_GENERATION,
+            capabilities=("image.generate",),
+        )
+        result = ImageService(session, storage).generate_image(
+            world_id,
+            ImageGenerateRequest(
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                prompt="draw through template capability",
+            ),
+            actor_ref="user:test",
+        )
+
+    assert result.output_asset.asset_kind == MediaAssetKind.IMAGE
+    assert result.output_objects[0].mime_type == "image/png"
+
+
+def test_image_edit_accepts_generate_capability_with_edit_flag(tmp_path: Path) -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world_graph(engine)
+    storage = LocalMediaObjectStorage(tmp_path)
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.IMAGE_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key="fake-gpt-image",
+                display_name="Fake GPT Image",
+                capabilities=(
+                    ProviderCapabilityCreate(
+                        capability_key="image.generate",
+                        capability_json={
+                            "value": True,
+                            "edit": True,
+                            "image_to_image": True,
+                        },
+                    ),
+                ),
+            )
+        )
+        source_asset_id = _seed_image_asset(
+            session,
+            storage,
+            world_id,
+            worldline_id,
+            _png((255, 255, 255, 255), 2, 2),
+            role=MediaAssetRole.REFERENCE_IMAGE,
+        )
+
+        result = ImageService(session, storage).edit_image(
+            world_id,
+            ImageEditRequest(
+                worldline_id=worldline_id,
+                provider_id=provider.id,
+                prompt="edit through template capability",
+                input_asset_ids=(source_asset_id,),
+            ),
+            actor_ref="user:test",
+        )
+
+    assert result.output_asset.asset_kind == MediaAssetKind.IMAGE
+    assert result.output_objects[0].mime_type == "image/png"
 
 
 def test_image_generate_rejects_required_transparency_when_provider_lacks_capability(

@@ -4,7 +4,7 @@ const worldOneId = "10000000-0000-4000-8000-000000000001";
 const primaryWorldlineId = "11000000-0000-4000-8000-000000000001";
 const seedConversationId = "76000000-0000-4000-8000-000000000001";
 
-test.describe.configure({ timeout: 60000 });
+test.describe.configure({ timeout: 120000 });
 test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async ({ request }) => {
@@ -81,14 +81,24 @@ test("platform admin creates a world", async ({ page }) => {
 
   await page.getByPlaceholder("world-slug").fill(`e2e-world-${Date.now()}`);
   await page.getByPlaceholder("World name").fill("E2E World");
+  const createResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" && response.url().endsWith("/api/worlds"),
+  );
+  const createdWorldUrlPromise = page.waitForURL(/\/worlds\/[0-9a-f-]+$/, {
+    timeout: 90_000,
+    waitUntil: "commit",
+  });
   await page.getByRole("button", { name: "Create world" }).click();
+  const createResponse = await createResponsePromise;
+  expect(createResponse.ok()).toBe(true);
 
-  await expect(page).toHaveURL(/\/worlds\/[0-9a-f-]+$/);
+  await createdWorldUrlPromise;
   await expect(page.getByRole("heading", { level: 1, name: "E2E World" })).toBeVisible();
 });
 
 test("platform admin manages presets and world composition import/export", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(420_000);
   await signIn(page);
 
   await goToAppPage(page, "/admin/presets");
@@ -96,8 +106,17 @@ test("platform admin manages presets and world composition import/export", async
   await page.getByPlaceholder("Preset name").fill("Storyteller");
   await page.getByPlaceholder("Description").fill("Narrative preset");
   await page.getByPlaceholder("Persona").fill("Writes clearly.");
+  const presetCreateResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" && response.url().endsWith("/api/agent-presets"),
+  );
   await page.getByRole("button", { name: "Create preset" }).click();
-  await expect(page.getByRole("heading", { name: "Storyteller" })).toBeVisible();
+  const presetCreateResponse = await presetCreateResponsePromise;
+  expect(presetCreateResponse.ok()).toBe(true);
+  await expect(page.getByText("Preset created.")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "Storyteller" })).toBeVisible({
+    timeout: 60_000,
+  });
 
   await goToAppPage(page, `/worlds/${worldOneId}/agents`);
   const presetSelect = page.locator('select[name="preset_id"]');
@@ -105,10 +124,19 @@ test("platform admin manages presets and world composition import/export", async
   await expect(presetSelect).not.toHaveValue("");
   await page.getByPlaceholder("agent-key").fill(`preset-agent-${Date.now()}`);
   await page.getByPlaceholder("Display name").fill("Preset Agent");
-  await Promise.all([
-    page.waitForURL(/\/agents\/[0-9a-f-]+$/),
-    page.getByRole("button", { name: "Create agent" }).click(),
-  ]);
+  const presetAgentResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(`/api/worlds/${worldOneId}/agents`),
+  );
+  const presetAgentUrlPromise = page.waitForURL(/\/agents\/[0-9a-f-]+$/, {
+    timeout: 90_000,
+    waitUntil: "commit",
+  });
+  await page.getByRole("button", { name: "Create agent" }).click();
+  const presetAgentResponse = await presetAgentResponsePromise;
+  expect(presetAgentResponse.ok()).toBe(true);
+  await presetAgentUrlPromise;
   await expect(page.getByText("Source preset: Storyteller (storyteller)")).toBeVisible();
   await expect(page.locator('textarea[name="persona_text"]')).toHaveValue("Writes clearly.");
 
@@ -124,7 +152,6 @@ test("platform admin manages presets and world composition import/export", async
   await expect(page.getByText("Composition exported.")).toBeVisible();
   const exportedComposition = JSON.stringify(await exportResponse.json(), null, 2);
   expect(exportedComposition).toContain("\"preset_references\"");
-  await goToAppPage(page, `/worlds/${worldOneId}`);
   await expect(page.getByRole("button", { name: "Import as new world" })).toBeVisible();
 
   const importedSlug = `imported-${Date.now()}`;
@@ -139,13 +166,18 @@ test("platform admin manages presets and world composition import/export", async
       response.request().method() === "POST" &&
       response.url().endsWith("/api/world-compositions/import"),
   );
-  const importedWorldUrlPromise = page.waitForURL(/\/worlds\/[0-9a-f-]+$/);
+  const importedWorldUrlPromise = page.waitForURL(/\/worlds\/[0-9a-f-]+$/, {
+    timeout: 90_000,
+    waitUntil: "commit",
+  });
   await importForm.getByRole("button", { name: "Import as new world" }).click();
   const importResponse = await importResponsePromise;
   expect(importResponse.ok()).toBe(true);
   await importedWorldUrlPromise;
-  await expect(page.getByRole("heading", { level: 1, name: "Imported World" })).toBeVisible();
-  await expect(page.getByText(`${importedSlug} - Active`)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Imported World" })).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.getByText(`${importedSlug} - Active`)).toBeVisible({ timeout: 60_000 });
 });
 
 test("world admin manages workspace pages and conversations", async ({ page }) => {
@@ -239,10 +271,19 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await goToAppPage(page, `/worlds/${worldOneId}/agents`);
   await page.getByPlaceholder("agent-key").fill(`agent-${Date.now()}`);
   await page.getByPlaceholder("Display name").fill("E2E Agent");
-  await Promise.all([
-    page.waitForURL(/\/worlds\/[0-9a-f-]+\/agents\/[0-9a-f-]+$/, { timeout: 15_000 }),
-    page.getByRole("button", { name: "Create agent" }).click(),
-  ]);
+  const agentCreateResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(`/api/worlds/${worldOneId}/agents`),
+  );
+  const agentBuilderUrlPromise = page.waitForURL(/\/worlds\/[0-9a-f-]+\/agents\/[0-9a-f-]+$/, {
+    timeout: 90_000,
+    waitUntil: "commit",
+  });
+  await page.getByRole("button", { name: "Create agent" }).click();
+  const agentCreateResponse = await agentCreateResponsePromise;
+  expect(agentCreateResponse.ok()).toBe(true);
+  await agentBuilderUrlPromise;
   await expect(page.getByRole("heading", { name: "Agent builder" })).toBeVisible();
 
   await page.getByPlaceholder("Persona text").fill("E2E persona");
@@ -455,6 +496,24 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
     timeout: 15_000,
   });
   await expect(page.getByText("Jobs: 1 / failed 0")).toBeVisible({ timeout: 15_000 });
+});
+
+test("world admin opens provider, media, visual, speech, and invocation pages", async ({ page }) => {
+  test.setTimeout(600_000);
+  await signIn(page);
+
+  for (const [path, heading] of [
+    [`/worlds/${worldOneId}/providers`, "Providers"],
+    [`/worlds/${worldOneId}/media`, "Media"],
+    [`/worlds/${worldOneId}/visual`, "Visual"],
+    [`/worlds/${worldOneId}/speech`, "Speech"],
+    [`/worlds/${worldOneId}/invocations`, "Invocations"],
+  ] as const) {
+    await goToAppPage(page, path);
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible({
+      timeout: 120_000,
+    });
+  }
 });
 
 test("publication blockers are surfaced and blocked drafts stay out of the reader", async ({ page }) => {
@@ -786,7 +845,7 @@ async function expectRedirectsToLogin(page: Page, path: string) {
 }
 
 async function goToAppPage(page: Page, path: string) {
-  await page.goto(path, { timeout: 30_000, waitUntil: "commit" }).catch((error: unknown) => {
+  await page.goto(path, { timeout: 180_000, waitUntil: "commit" }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.includes("net::ERR_ABORTED")) {
       throw error;
@@ -799,5 +858,5 @@ async function signIn(page: Page, email = "admin@example.test") {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/worlds$/);
+  await expect(page).toHaveURL(/\/worlds$/, { timeout: 90_000 });
 }

@@ -24,6 +24,25 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events.models import WorldEventModel
+from noveland.invocations.models import (
+    AgentRuntimeRunModelInvocation,
+    ModelInvocation,
+    ModelInvocationTag,
+    PromptSnapshot,
+    PromptTemplate,
+)
+from noveland.media.models import (
+    MediaAsset,
+    MediaAssetCollection,
+    MediaAssetCollectionItem,
+    MediaAssetContext,
+    MediaAssetInput,
+    MediaAssetTag,
+    MediaJob,
+    MediaObject,
+    MediaReference,
+)
+from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
 from noveland.narrative import (
     ConversationNarrativeArtifactSet,
     ConversationNarrativeGenerate,
@@ -36,6 +55,20 @@ from noveland.narrative import (
     NarrativePublicationBlockedError,
 )
 from noveland.narrative.models import NarrativePublication
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderCapabilityCreate,
+    ProviderIntegrationCreate,
+    ProviderKind,
+    ProviderScopeKind,
+)
+from noveland.providers.models import (
+    ProviderBudgetPolicy,
+    ProviderCapability,
+    ProviderHealthCheck,
+    ProviderIntegration,
+)
+from noveland.providers.registry import ProviderRegistryService
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
@@ -99,6 +132,122 @@ def test_writer_generates_summary_then_chapter() -> None:
     assert artifacts[0].metadata["generation_mode"] == "manual"
     assert artifacts[0].metadata["source_turn_count"] == 2
     assert artifacts[0].source_conversation_id == conversation_id
+    assert artifacts[0].worldline_id is not None
+    assert artifacts[1].worldline_id == artifacts[0].worldline_id
+
+
+def test_writer_generates_chapter_with_provider_execution_service() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    scene_id = _seed_scene(engine, world_id)
+    agent_id = _seed_agent(engine, world_id, scene_id)
+    profile_service = FakeProfileService()
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key="writer-text-provider",
+                display_name="Writer Text Provider",
+                capabilities=(
+                    ProviderCapabilityCreate(
+                        capability_key="text.generate",
+                        capability_json={"value": True},
+                    ),
+                ),
+            ),
+        )
+        conversation_id = _seed_conversation(
+            session,
+            world_id=world_id,
+            scene_id=scene_id,
+            agent_id=agent_id,
+            writer_config=ConversationWriterConfig(
+                provider_profile_id=provider.id,
+                auto_generate_on_complete=False,
+                generate_summary=False,
+                generate_chapter=True,
+            ),
+        )
+        artifacts = ConversationNarrativeWriterService(
+            session,
+            profile_service,
+        ).generate_for_conversation(
+            ConversationNarrativeGenerate(
+                world_id=world_id,
+                conversation_id=conversation_id,
+                artifact_set=ConversationNarrativeArtifactSet.CHAPTER_ONLY,
+                provider_profile_id=provider.id,
+                generation_mode=NarrativeGenerationMode.MANUAL,
+            ),
+        )
+        invocation_count = len(session.scalars(select(ModelInvocation)).all())
+
+    assert profile_service.prompts == []
+    assert len(artifacts) == 1
+    assert artifacts[0].artifact_kind == NarrativeArtifactKind.CHAPTER_DRAFT
+    assert artifacts[0].content.startswith("fake text: Writer controls:")
+    assert artifacts[0].metadata["provider_integration_id"] == str(provider.id)
+    assert invocation_count == 2
+
+
+def test_writer_prefers_provider_execution_default_over_legacy_profile() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    scene_id = _seed_scene(engine, world_id)
+    agent_id = _seed_agent(engine, world_id, scene_id)
+    profile_service = FakeProfileService()
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key="default-writer-text-provider",
+                display_name="Default Writer Text Provider",
+                capabilities=(
+                    ProviderCapabilityCreate(
+                        capability_key="text.generate",
+                        capability_json={"value": True},
+                    ),
+                ),
+            ),
+        )
+        conversation_id = _seed_conversation(
+            session,
+            world_id=world_id,
+            scene_id=scene_id,
+            agent_id=agent_id,
+            writer_config=ConversationWriterConfig(
+                provider_profile_id=None,
+                auto_generate_on_complete=False,
+                generate_summary=False,
+                generate_chapter=True,
+            ),
+        )
+
+        artifacts = ConversationNarrativeWriterService(
+            session,
+            profile_service,
+        ).generate_for_conversation(
+            ConversationNarrativeGenerate(
+                world_id=world_id,
+                conversation_id=conversation_id,
+                artifact_set=ConversationNarrativeArtifactSet.CHAPTER_ONLY,
+                provider_profile_id=None,
+                generation_mode=NarrativeGenerationMode.MANUAL,
+            ),
+        )
+
+    assert profile_service.prompts == []
+    assert len(artifacts) == 1
+    assert artifacts[0].content.startswith("fake text: Writer controls:")
+    assert artifacts[0].metadata["provider_integration_id"] == str(provider.id)
 
 
 def test_auto_generate_is_idempotent_for_completed_session() -> None:
@@ -454,6 +603,7 @@ def _engine() -> Engine:
     )
     for table in (
         cast(Table, User.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
         cast(Table, Worldline.__table__),
         cast(Table, Scene.__table__),
@@ -473,6 +623,25 @@ def _engine() -> Engine:
         cast(Table, StoryHook.__table__),
         cast(Table, PlotThread.__table__),
         cast(Table, RouteAffinity.__table__),
+        cast(Table, MemoryWriteJob.__table__),
+        cast(Table, ProviderIntegration.__table__),
+        cast(Table, ProviderCapability.__table__),
+        cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
+        cast(Table, MediaJob.__table__),
+        cast(Table, MediaAsset.__table__),
+        cast(Table, MediaObject.__table__),
+        cast(Table, MediaReference.__table__),
+        cast(Table, MediaAssetContext.__table__),
+        cast(Table, MediaAssetInput.__table__),
+        cast(Table, MediaAssetTag.__table__),
+        cast(Table, MediaAssetCollection.__table__),
+        cast(Table, MediaAssetCollectionItem.__table__),
+        cast(Table, ModelInvocation.__table__),
+        cast(Table, PromptTemplate.__table__),
+        cast(Table, PromptSnapshot.__table__),
+        cast(Table, AgentRuntimeRunModelInvocation.__table__),
+        cast(Table, ModelInvocationTag.__table__),
     ):
         table.create(engine)
     return engine

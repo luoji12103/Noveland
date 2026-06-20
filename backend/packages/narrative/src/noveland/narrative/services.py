@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol, cast
 
@@ -36,6 +37,11 @@ from noveland.plugins.errors import (
     PluginFactoryError,
     PluginNotFoundError,
 )
+from noveland.providers.contracts import (
+    ProviderExecutionRequest,
+    ProviderKind,
+)
+from noveland.providers.registry import ProviderNotFoundError, ProviderRegistryService
 from noveland.worlds.guardrails import LivingWorldGuardrailService
 from noveland.worlds.living_context import LivingWorldContextSelector
 from sqlalchemy import or_, select
@@ -52,6 +58,17 @@ class NarrativeProviderService(Protocol):
         profile: ProviderProfileRecord,
         prompt: str,
     ) -> ProviderCompletion: ...
+
+
+@dataclass(frozen=True, slots=True)
+class _ResolvedWriterProvider:
+    id: uuid.UUID
+    provider_key: str
+    legacy_profile: ProviderProfileRecord | None = None
+
+    @property
+    def uses_provider_execution(self) -> bool:
+        return self.legacy_profile is None
 
 
 class NarrativeArtifactService:
@@ -415,6 +432,7 @@ class ConversationNarrativeWriterService:
         )
         provider = self._resolve_provider(
             generate.provider_profile_id or session.writer_config.provider_profile_id,
+            world_id=generate.world_id,
         )
         writer_plugin = self._resolve_writer_plugin(
             session.writer_config.writer_plugin_identifier,
@@ -455,13 +473,17 @@ class ConversationNarrativeWriterService:
                     worldline_id=session.worldline_id,
                     participants=participants,
                 )
-                summary_text = self._profile_service.invoke_profile(
+                summary_text = self._invoke_writer_provider(
                     provider,
                     summary_prompt,
+                    world_id=generate.world_id,
+                    worldline_id=session.worldline_id,
+                    actor_ref="service:narrative-writer:summary",
                 ).text.strip()
                 summary_artifact = self._artifact_service.create_artifact(
                     NarrativeArtifactCreate(
                         world_id=generate.world_id,
+                        worldline_id=session.worldline_id,
                         source_conversation_id=generate.conversation_id,
                         title=f"{session.title} summary",
                         content=summary_text,
@@ -492,9 +514,12 @@ class ConversationNarrativeWriterService:
                 worldline_id=session.worldline_id,
                 participants=participants,
             )
-            summary_text = self._profile_service.invoke_profile(
+            summary_text = self._invoke_writer_provider(
                 provider,
                 summary_prompt,
+                world_id=generate.world_id,
+                worldline_id=session.worldline_id,
+                actor_ref="service:narrative-writer:summary-preview",
             ).text.strip()
 
         if needs_chapter:
@@ -523,11 +548,15 @@ class ConversationNarrativeWriterService:
                 chapter_artifact = self._artifact_service.create_artifact(
                     NarrativeArtifactCreate(
                         world_id=generate.world_id,
+                        worldline_id=session.worldline_id,
                         source_conversation_id=generate.conversation_id,
                         title=f"{session.title} chapter draft",
-                        content=self._profile_service.invoke_profile(
+                        content=self._invoke_writer_provider(
                             provider,
                             chapter_prompt,
+                            world_id=generate.world_id,
+                            worldline_id=session.worldline_id,
+                            actor_ref="service:narrative-writer:chapter",
                         ).text.strip(),
                         artifact_kind=NarrativeArtifactKind.CHAPTER_DRAFT,
                         metadata=_metadata(
@@ -550,7 +579,7 @@ class ConversationNarrativeWriterService:
         bundle = self._conversation_prompt_bundle(generate)
         prompt = bundle["summary_prompt"] if bundle["needs_summary"] else bundle["chapter_prompt"]
         assert isinstance(prompt, str)
-        provider = cast(ProviderProfileRecord, bundle["provider"])
+        provider = cast(_ResolvedWriterProvider, bundle["provider"])
         session = cast(ConversationSessionRecord, bundle["session"])
         turns = cast(list[ConversationTurnRecord], bundle["turns"])
         existing_count = 0
@@ -576,7 +605,7 @@ class ConversationNarrativeWriterService:
             conversation_id=generate.conversation_id,
             artifact_set=generate.artifact_set,
             provider_profile_id=provider.id,
-            provider_profile_key=provider.profile_key,
+            provider_profile_key=provider.provider_key,
             writer_plugin_identifier=session.writer_config.writer_plugin_identifier,
             prompt_text=prompt,
             source_turn_count=len(turns),
@@ -613,21 +642,87 @@ class ConversationNarrativeWriterService:
     def _resolve_provider(
         self,
         provider_profile_id: uuid.UUID | None,
-    ) -> ProviderProfileRecord:
+        *,
+        world_id: uuid.UUID,
+    ) -> _ResolvedWriterProvider:
         profile: ProviderProfileRecord | None
         if provider_profile_id is not None:
             profile = self._profile_service.get_profile(provider_profile_id)
-            if profile is None:
-                raise ProviderConfigurationError("Configured writer provider profile was not found")
-            if not profile.is_enabled:
-                raise ProviderConfigurationError(
-                    "Configured writer provider profile is disabled",
+            if profile is not None:
+                if not profile.is_enabled:
+                    raise ProviderConfigurationError(
+                        "Configured writer provider profile is disabled",
+                    )
+                return _ResolvedWriterProvider(
+                    id=profile.id,
+                    provider_key=profile.profile_key,
+                    legacy_profile=profile,
                 )
-            return profile
-        profile = self._profile_service.first_enabled_profile()
-        if profile is None:
-            raise ProviderConfigurationError("No enabled provider profile is available")
-        return profile
+            provider = ProviderRegistryService(self._session).get_provider(
+                world_id,
+                provider_profile_id,
+                platform_admin=True,
+                include_hidden=True,
+            )
+            if provider is None:
+                raise ProviderConfigurationError("Configured writer provider was not found")
+            return _ResolvedWriterProvider(
+                id=provider.id,
+                provider_key=provider.provider_key,
+            )
+        try:
+            provider = ProviderRegistryService(self._session).resolve_provider_for_capability(
+                world_id,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                capability_key="text.generate",
+                platform_admin=True,
+                include_hidden=True,
+            )
+        except ProviderNotFoundError as exc:
+            profile = self._profile_service.first_enabled_profile()
+            if profile is not None:
+                return _ResolvedWriterProvider(
+                    id=profile.id,
+                    provider_key=profile.profile_key,
+                    legacy_profile=profile,
+                )
+            raise ProviderConfigurationError("No enabled writer provider is available") from exc
+        return _ResolvedWriterProvider(
+            id=provider.id,
+            provider_key=provider.provider_key,
+        )
+
+    def _invoke_writer_provider(
+        self,
+        provider: _ResolvedWriterProvider,
+        prompt: str,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+        actor_ref: str,
+    ) -> ProviderCompletion:
+        if provider.legacy_profile is not None:
+            return self._profile_service.invoke_profile(provider.legacy_profile, prompt)
+        from noveland.providers.service import ProviderExecutionError, ProviderExecutionService
+
+        try:
+            result = ProviderExecutionService(self._session).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider.id,
+                    provider_kind=ProviderKind.TEXT_GENERATION,
+                    capability_key="text.generate",
+                    input_text=prompt,
+                    actor_ref=actor_ref,
+                ),
+            )
+        except ProviderExecutionError as exc:
+            raise ProviderConfigurationError(str(exc)) from exc
+        text = (result.output_text or "").strip()
+        if text == "":
+            raise ProviderConfigurationError("Writer provider returned no text")
+        return ProviderCompletion(text=text, raw_response=result.output_json)
 
     def _resolve_writer_plugin(
         self,
@@ -674,6 +769,7 @@ class ConversationNarrativeWriterService:
         )
         provider = self._resolve_provider(
             generate.provider_profile_id or session.writer_config.provider_profile_id,
+            world_id=generate.world_id,
         )
         writer_plugin = self._resolve_writer_plugin(
             session.writer_config.writer_plugin_identifier,
@@ -784,17 +880,23 @@ def _metadata(
     *,
     session: ConversationSessionRecord,
     turns: list[ConversationTurnRecord],
-    provider: ProviderProfileRecord,
+    provider: _ResolvedWriterProvider,
     generation_mode: NarrativeGenerationMode,
     living_world_context: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    provider_metadata = (
+        {"provider_profile_id": str(provider.id)}
+        if not provider.uses_provider_execution
+        else {"provider_integration_id": str(provider.id)}
+    )
     return {
         "generation_mode": generation_mode.value,
         "worldline_id": None if session.worldline_id is None else str(session.worldline_id),
         "source_turn_count": len(turns),
         "source_turn_end_index": None if not turns else turns[-1].turn_index,
         "scope_type": session.scope_type.value,
-        "provider_profile_id": str(provider.id),
+        **provider_metadata,
+        "provider_key": provider.provider_key,
         "writer_target_length": session.writer_config.target_length,
         "writer_has_style_guide": bool(session.writer_config.style_guide),
         "writer_has_source_constraints": bool(session.writer_config.source_constraints),

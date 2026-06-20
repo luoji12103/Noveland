@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from noveland.invocations.contracts import InvocationRecordView
+from noveland.invocations.contracts import InvocationActorKind, InvocationKind, InvocationRecordView
 from noveland.media.contracts import MediaAssetRecord, MediaJobRecord, MediaObjectRecord
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -390,6 +390,7 @@ class ProviderQuotaStatusRead(_FrozenContract):
 class ProviderExecutionRequest(_FrozenContract):
     world_id: uuid.UUID
     worldline_id: uuid.UUID | None = None
+    trace_id: uuid.UUID | None = None
     provider_id: uuid.UUID | None = None
     provider_kind: ProviderKind | None = None
     capability_key: str | None = Field(default=None, min_length=1, max_length=120)
@@ -400,6 +401,11 @@ class ProviderExecutionRequest(_FrozenContract):
     media_job_id: uuid.UUID | None = None
     media_asset_id: uuid.UUID | None = None
     player_actor_id: uuid.UUID | None = None
+    invocation_kind: InvocationKind | None = None
+    actor_kind: InvocationActorKind = InvocationActorKind.SERVICE
+    agent_id: uuid.UUID | None = None
+    conversation_id: uuid.UUID | None = None
+    turn_id: uuid.UUID | None = None
     actor_ref: str | None = Field(default=None, min_length=1, max_length=160)
     platform_admin: bool = True
     fallback_provider_id: uuid.UUID | None = None

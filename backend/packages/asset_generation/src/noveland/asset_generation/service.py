@@ -47,6 +47,7 @@ from noveland.media.models import MediaJob
 from noveland.media.service import MediaJobService
 from noveland.providers.contracts import ProviderIntegrationRead, ProviderKind
 from noveland.providers.registry import ProviderNotFoundError, ProviderRegistryService
+from noveland.providers.routing import equivalent_capability_keys
 from noveland.speech.models import AgentVoiceProfileBinding, VoiceProfile
 from noveland.visual.models import (
     CharacterSpriteSet,
@@ -301,12 +302,12 @@ class AssetGenerationService:
         image_provider = self._resolve_provider(
             world_id,
             provider_kind=ProviderKind.IMAGE_GENERATION,
-            capability_key="supports_image_generation",
+            capability_key="image.generate",
         )
         speech_provider = self._resolve_provider(
             world_id,
             provider_kind=ProviderKind.TEXT_TO_SPEECH,
-            capability_key="supports_tts",
+            capability_key="speech.tts",
         )
         for turn, session_model, presentation in turns:
             priority = _priority_for_turn(turn, session_model, request.current_turn_id)
@@ -738,14 +739,17 @@ class AssetGenerationService:
         provider_kind: ProviderKind,
         capability_key: str,
     ) -> ProviderIntegrationRead | None:
-        try:
-            return ProviderRegistryService(self._session).resolve_provider_for_capability(
-                world_id,
-                provider_kind=provider_kind,
-                capability_key=capability_key,
-            )
-        except ProviderNotFoundError:
-            return None
+        registry = ProviderRegistryService(self._session)
+        for candidate_key in equivalent_capability_keys(capability_key):
+            try:
+                return registry.resolve_provider_for_capability(
+                    world_id,
+                    provider_kind=provider_kind,
+                    capability_key=candidate_key,
+                )
+            except ProviderNotFoundError:
+                continue
+        return None
 
     def _target_jobs(
         self,

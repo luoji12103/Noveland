@@ -58,6 +58,15 @@ from noveland.observability import (
     RuntimeDiagnosticsService,
 )
 from noveland.observability.models import RuntimeDiagnosticEvent
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderIntegrationCreate,
+    ProviderKind,
+    ProviderScopeKind,
+    ProviderVisibility,
+)
+from noveland.providers.models import ProviderCapability, ProviderIntegration
+from noveland.providers.registry import ProviderRegistryService
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
@@ -3945,6 +3954,41 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     assert "/root/" not in member_character_profile_text
 
 
+def test_agent_create_and_update_accept_provider_integration_id() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "provider-agent-world")
+    provider_id = _seed_text_provider_integration(engine, world_id)
+    replacement_provider_id = _seed_text_provider_integration(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    create_agent = client.post(
+        f"/worlds/{world_id}/agents",
+        json={
+            "agent_key": "provider-agent",
+            "display_name": "Provider Agent",
+            "kind": "role_agent",
+            "provider_profile_id": str(provider_id),
+        },
+    )
+    assert create_agent.status_code == 201
+
+    agent_id = create_agent.json()["id"]
+    update_agent = client.patch(
+        f"/worlds/{world_id}/agents/{agent_id}",
+        json={"provider_profile_id": str(replacement_provider_id)},
+    )
+
+    assert create_agent.json()["provider_profile_id"] == str(provider_id)
+    assert create_agent.json()["config"]["provider_profile_id"] == str(provider_id)
+    assert update_agent.status_code == 200
+    assert update_agent.json()["provider_profile_id"] == str(replacement_provider_id)
+    assert update_agent.json()["config"]["provider_profile_id"] == str(
+        replacement_provider_id,
+    )
+
+
 def test_agent_preset_update_preview_reports_stale_and_current_agents() -> None:
     client, engine = _client_with_database()
     _platform_user_id, platform_token = _seed_user(
@@ -5326,6 +5370,8 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, MemoryRetrievalLog.__table__),
         cast(Table, AgentProfileSnapshotModel.__table__),
         cast(Table, ProviderProfile.__table__),
+        cast(Table, ProviderIntegration.__table__),
+        cast(Table, ProviderCapability.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, ModelInvocation.__table__),
         cast(Table, PromptTemplate.__table__),
@@ -5504,6 +5550,24 @@ def _seed_provider_profile(
         )
         session.commit()
     return profile_id
+
+
+def _seed_text_provider_integration(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key=f"text-{uuid.uuid4().hex[:8]}",
+                display_name="Text Provider",
+                visibility=ProviderVisibility.WORLD_ADMIN,
+                capabilities=(),
+            ),
+        )
+        session.commit()
+        return provider.id
 
 
 def _provider_profile_id_by_key(engine: Engine, profile_key: str) -> uuid.UUID:

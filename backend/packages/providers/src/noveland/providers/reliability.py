@@ -25,7 +25,7 @@ from noveland.providers.contracts import (
 )
 from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
 from noveland.providers.registry import ProviderNotFoundError, ProviderRegistryService
-from noveland.providers.routing import capability_key_for_provider
+from noveland.providers.routing import capability_key_for_provider, equivalent_capability_keys
 from noveland.providers.secrets import (
     ProviderSecretMissingError,
     ProviderSecretResolver,
@@ -392,7 +392,7 @@ class ProviderReliabilityService:
         capability = self._session.scalar(
             select(ProviderCapability.id).where(
                 ProviderCapability.provider_integration_id == provider_id,
-                ProviderCapability.capability_key == capability_key,
+                ProviderCapability.capability_key.in_(equivalent_capability_keys(capability_key)),
             )
         )
         if capability is not None:

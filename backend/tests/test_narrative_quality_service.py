@@ -713,6 +713,36 @@ def test_narrative_writer_v2_creates_worldline_scoped_draft_and_invocation() -> 
     assert event_count == 0
 
 
+def test_narrative_writer_v2_accepts_openai_compatible_text_provider_dry_run() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    provider_id = _seed_text_provider(
+        engine,
+        world_id,
+        adapter_kind=ProviderAdapterKind.OPENAI_COMPATIBLE,
+        config_json={"dry_run": True},
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).generate_narrative_v2(
+            world_id,
+            NarrativeQualityWriterGenerateRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                provider_id=provider_id,
+                artifact_kind=NarrativeArtifactKind.CHAPTER_DRAFT,
+                prompt_goal="Draft with a real text adapter dry-run.",
+            ),
+            actor_ref="test",
+        )
+
+    assert result.provider.adapter_kind == ProviderAdapterKind.OPENAI_COMPATIBLE
+    assert result.invocation.status == "succeeded"
+    assert result.artifact is not None
+    assert "openai-compatible dry-run:" in result.artifact.content
+
+
 def test_narrative_writer_v2_dry_run_writes_invocation_but_no_artifact() -> None:
     engine = _engine()
     world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
@@ -2208,14 +2238,29 @@ def _seed_aligned_presentation(
         session.commit()
 
 
-def _seed_text_provider(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
-    return _seed_provider(engine, world_id, ProviderKind.TEXT_GENERATION)
+def _seed_text_provider(
+    engine: Engine,
+    world_id: uuid.UUID,
+    *,
+    adapter_kind: ProviderAdapterKind = ProviderAdapterKind.FAKE,
+    config_json: dict[str, Any] | None = None,
+) -> uuid.UUID:
+    return _seed_provider(
+        engine,
+        world_id,
+        ProviderKind.TEXT_GENERATION,
+        adapter_kind=adapter_kind,
+        config_json=config_json,
+    )
 
 
 def _seed_provider(
     engine: Engine,
     world_id: uuid.UUID,
     provider_kind: ProviderKind,
+    *,
+    adapter_kind: ProviderAdapterKind = ProviderAdapterKind.FAKE,
+    config_json: dict[str, Any] | None = None,
 ) -> uuid.UUID:
     with Session(engine) as session:
         provider = ProviderRegistryService(session).create_provider(
@@ -2223,9 +2268,10 @@ def _seed_provider(
                 world_id=world_id,
                 scope_kind=ProviderScopeKind.WORLD,
                 provider_kind=provider_kind,
-                adapter_kind=ProviderAdapterKind.FAKE,
-                provider_key=f"fake-{provider_kind.value}",
-                display_name=f"Fake {provider_kind.value}",
+                adapter_kind=adapter_kind,
+                provider_key=f"{adapter_kind.value}-{provider_kind.value}-{uuid.uuid4().hex[:8]}",
+                display_name=f"{adapter_kind.value} {provider_kind.value}",
+                config_json={} if config_json is None else config_json,
             )
         )
         session.commit()

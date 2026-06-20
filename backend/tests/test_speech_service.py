@@ -146,6 +146,62 @@ def test_tts_fake_provider_writes_invocation_media_job_asset_and_turn_reference(
         assert event.payload == {"kind": "seed"}
 
 
+def test_speech_service_accepts_template_capability_keys(tmp_path: Path) -> None:
+    engine = _engine()
+    graph = _seed_world_graph(engine)
+    storage = LocalMediaObjectStorage(tmp_path)
+
+    with Session(engine) as session:
+        tts_provider_id = _seed_provider(
+            session,
+            graph.world_id,
+            ProviderKind.TEXT_TO_SPEECH,
+            capabilities=("speech.tts",),
+        )
+        stt_provider_id = _seed_provider(
+            session,
+            graph.world_id,
+            ProviderKind.SPEECH_TO_TEXT,
+            provider_key="fake-template-stt",
+            capabilities=("speech.asr",),
+        )
+        voice_profile_id = _seed_voice_profile(
+            session,
+            graph.world_id,
+            graph.worldline_id,
+            provider_id=tts_provider_id,
+        )
+        source_asset_id = _seed_audio_asset(
+            session,
+            storage,
+            graph.world_id,
+            graph.worldline_id,
+        )
+
+        tts = SpeechService(session, storage).text_to_speech(
+            graph.world_id,
+            TTSRequest(
+                worldline_id=graph.worldline_id,
+                provider_id=tts_provider_id,
+                voice_profile_id=voice_profile_id,
+                text="template capability tts",
+            ),
+            actor_ref="user:test",
+        )
+        stt = SpeechService(session, storage).speech_to_text(
+            graph.world_id,
+            STTRequest(
+                worldline_id=graph.worldline_id,
+                provider_id=stt_provider_id,
+                source_asset_id=source_asset_id,
+            ),
+            actor_ref="user:test",
+        )
+
+    assert tts.output_asset.asset_role == "speech_audio"
+    assert stt.transcript.transcript_text == "fake transcript"
+
+
 def test_stt_fake_provider_writes_invocation_transcript_job_and_turn_reference(
     tmp_path: Path,
 ) -> None:

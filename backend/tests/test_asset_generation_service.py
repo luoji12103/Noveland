@@ -130,6 +130,33 @@ def test_preview_persists_proposals_without_media_jobs_and_apply_creates_selecte
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_preview_resolves_template_capability_keys() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    with Session(engine) as session:
+        _seed_provider(session, graph.world_id, ProviderKind.IMAGE_GENERATION, "image.generate")
+        _seed_provider(session, graph.world_id, ProviderKind.TEXT_TO_SPEECH, "speech.tts")
+        _seed_voice_binding(session, graph)
+
+        preview = AssetGenerationService(session).preview(
+            graph.world_id,
+            AssetGenerationPreviewRequest(
+                worldline_id=graph.worldline_id,
+                conversation_id=graph.conversation_id,
+                current_turn_id=graph.turn_ids[0],
+            ),
+            actor_ref="test",
+        )
+
+    proposed = [
+        proposal
+        for proposal in preview.run.proposals
+        if proposal.status == AssetGenerationProposalStatus.PROPOSED
+    ]
+    assert len(proposed) >= 3
+    assert all(proposal.provider_id is not None for proposal in proposed)
+
+
 def test_budget_and_missing_provider_capability_block_proposals() -> None:
     engine = _engine()
     graph = _seed_graph(engine)

@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from noveland.adapters import (
+    ProviderCompletion,
     ProviderConfigurationError,
     ProviderError,
     ProviderProfileRecord,
@@ -40,6 +41,7 @@ from noveland.invocations.contracts import (
     InvocationVisibility,
     PromptSnapshotUpdate,
 )
+from noveland.invocations.models import AgentRuntimeRunModelInvocation, ModelInvocation
 from noveland.memory import MemoryContext, MemoryMessage, MemoryService, MemoryTurn
 from noveland.narrative import (
     NarrativeArtifactCreate,
@@ -65,6 +67,14 @@ from noveland.plugins.errors import (
     PluginFactoryError,
     PluginNotFoundError,
 )
+from noveland.providers.contracts import (
+    ProviderExecutionRequest,
+    ProviderIntegrationRead,
+    ProviderKind,
+)
+from noveland.providers.registry import ProviderNotFoundError, ProviderRegistryService
+from noveland.providers.routing import invocation_provider_kind_for_adapter
+from noveland.providers.service import ProviderExecutionError, ProviderExecutionService
 from noveland.services.runtime.identity import RUNTIME_ACTOR_REF
 from noveland.worlds.clock_service import WorldClockService
 from noveland.worlds.living_context import LivingWorldContextSelector
@@ -104,6 +114,18 @@ class AgentRunExecution:
 @dataclass(frozen=True, slots=True)
 class DueRunBatchResult:
     executed_runs: int
+
+
+@dataclass(frozen=True, slots=True)
+class _ResolvedRuntimeProvider:
+    id: uuid.UUID
+    provider_key: str
+    legacy_profile: ProviderProfileRecord | None = None
+    provider_integration: ProviderIntegrationRead | None = None
+
+    @property
+    def uses_provider_execution(self) -> bool:
+        return self.provider_integration is not None
 
 
 class AgentRuntimeOrchestrator:
@@ -222,11 +244,13 @@ class AgentRuntimeOrchestrator:
             "living_context": living_context.diagnostics,
             "living_context_pack": living_context_pack.diagnostics,
         }
+        provider = self._resolve_provider(agent, provider_profile_id, world_id=world_id)
+        provider_metadata = _runtime_provider_metadata(provider)
         run_model = AgentRuntimeRun(
             world_id=world_id,
             worldline_id=resolved_worldline_id,
             agent_id=agent_id,
-            provider_profile_id=provider_profile_id,
+            provider_profile_id=_runtime_provider_profile_id(provider),
             source_calendar_entry_id=source_calendar_entry_id,
             source_schedule_rule_id=source_schedule_rule_id,
             status="running",
@@ -250,95 +274,135 @@ class AgentRuntimeOrchestrator:
             actor_ref=RUNTIME_ACTOR_REF,
         )
 
-        provider_profile = self._resolve_profile(agent, provider_profile_id)
-        run_model.provider_profile_id = None if provider_profile is None else provider_profile.id
-        invocation = InvocationLedgerService(self._session).record(
-            InvocationRecordCreate(
-                world_id=world_id,
-                worldline_id=resolved_worldline_id,
-                trace_id=uuid.uuid4(),
-                invocation_kind=InvocationKind.AGENT_RUNTIME,
-                actor_kind=InvocationActorKind.RUNTIME,
-                actor_ref=RUNTIME_ACTOR_REF,
-                agent_id=agent_id,
-                provider_kind=_invocation_provider_kind(provider_profile),
-                provider_profile_id=None if provider_profile is None else provider_profile.id,
-                model_name=None if provider_profile is None else provider_profile.model_name,
-                input_text=_runtime_prompt_summary(prompt_text),
-                request_params_json={
-                    "trigger_source": trigger_source,
-                    "retrieve_memory": retrieve_memory,
-                    "max_context_items": max_context_items,
-                    "create_memory": create_memory,
-                    "create_narrative_artifact": create_narrative_artifact,
-                },
-                status=InvocationStatus.RUNNING,
-                visibility=InvocationVisibility.WORLD_ADMIN,
-                redaction_status=InvocationRedactionStatus.RAW,
-                retention_policy=InvocationRetentionPolicy.LOCAL_DEBUG,
-                contains_sensitive_context=_contains_sensitive_context(prompt_context),
-                prompt_snapshot=PromptSnapshotCreate(
-                    raw_prompt_text=provider_prompt,
-                    raw_request_json={
-                        "provider_profile_id": None
-                        if provider_profile is None
-                        else str(provider_profile.id),
-                        "provider_type": None
-                        if provider_profile is None
-                        else provider_profile.provider_type.value,
-                        "model_name": None
-                        if provider_profile is None
-                        else provider_profile.model_name,
+        trace_id = uuid.uuid4()
+        invocation_id: uuid.UUID | None = None
+        if provider.legacy_profile is not None:
+            invocation = InvocationLedgerService(self._session).record(
+                InvocationRecordCreate(
+                    world_id=world_id,
+                    worldline_id=resolved_worldline_id,
+                    trace_id=trace_id,
+                    invocation_kind=InvocationKind.AGENT_RUNTIME,
+                    actor_kind=InvocationActorKind.RUNTIME,
+                    actor_ref=RUNTIME_ACTOR_REF,
+                    agent_id=agent_id,
+                    provider_kind=_invocation_provider_kind(provider),
+                    provider_profile_id=provider.legacy_profile.id,
+                    model_name=provider.legacy_profile.model_name,
+                    input_text=_runtime_prompt_summary(prompt_text),
+                    request_params_json={
+                        "trigger_source": trigger_source,
+                        "retrieve_memory": retrieve_memory,
+                        "max_context_items": max_context_items,
+                        "create_memory": create_memory,
+                        "create_narrative_artifact": create_narrative_artifact,
+                        **provider_metadata,
                     },
-                    prompt_context_snapshot_json=prompt_context,
+                    status=InvocationStatus.RUNNING,
                     visibility=InvocationVisibility.WORLD_ADMIN,
                     redaction_status=InvocationRedactionStatus.RAW,
+                    retention_policy=InvocationRetentionPolicy.LOCAL_DEBUG,
                     contains_sensitive_context=_contains_sensitive_context(prompt_context),
-                ),
+                    prompt_snapshot=PromptSnapshotCreate(
+                        raw_prompt_text=provider_prompt,
+                        raw_request_json=_runtime_provider_prompt_json(provider),
+                        prompt_context_snapshot_json=prompt_context,
+                        visibility=InvocationVisibility.WORLD_ADMIN,
+                        redaction_status=InvocationRedactionStatus.RAW,
+                        contains_sensitive_context=_contains_sensitive_context(prompt_context),
+                    ),
+                )
             )
-        )
-        InvocationLedgerService(self._session).link_runtime_run(
-            AgentRuntimeRunInvocationLinkCreate(
-                world_id=world_id,
-                worldline_id=resolved_worldline_id,
-                agent_runtime_run_id=run_model.id,
-                model_invocation_id=invocation.id,
-                invocation_role=InvocationRole.PRIMARY,
-                sequence_index=0,
+            invocation_id = invocation.id
+            InvocationLedgerService(self._session).link_runtime_run(
+                AgentRuntimeRunInvocationLinkCreate(
+                    world_id=world_id,
+                    worldline_id=resolved_worldline_id,
+                    agent_runtime_run_id=run_model.id,
+                    model_invocation_id=invocation.id,
+                    invocation_role=InvocationRole.PRIMARY,
+                    sequence_index=0,
+                )
             )
-        )
 
         try:
-            if provider_profile is None:
-                raise ProviderConfigurationError("No enabled provider profile is available")
             provider_started_at = datetime.now(UTC)
-            completion = self._profile_service.invoke_profile(provider_profile, provider_prompt)
+            if provider.legacy_profile is not None:
+                completion = self._profile_service.invoke_profile(
+                    provider.legacy_profile,
+                    provider_prompt,
+                )
+                if invocation_id is None:
+                    raise ProviderConfigurationError("Runtime invocation was not recorded")
+                InvocationLedgerService(self._session).update_status(
+                    world_id,
+                    invocation_id,
+                    InvocationStatusUpdate(
+                        status=InvocationStatus.SUCCEEDED,
+                        output_text=completion.text,
+                        response_metadata_json=completion.raw_response,
+                        latency_ms=_latency_ms(provider_started_at),
+                    ),
+                )
+                PromptSnapshotService(self._session).update_snapshot_for_invocation(
+                    invocation_id,
+                    PromptSnapshotUpdate(
+                        raw_response_json=completion.raw_response,
+                        raw_output_text=completion.text,
+                    ),
+                )
+            else:
+                result = ProviderExecutionService(self._session).execute(
+                    ProviderExecutionRequest(
+                        world_id=world_id,
+                        worldline_id=resolved_worldline_id,
+                        trace_id=trace_id,
+                        provider_id=provider.id,
+                        provider_kind=ProviderKind.TEXT_GENERATION,
+                        capability_key="text.generate",
+                        input_text=provider_prompt,
+                        input_json={
+                            "trigger_source": trigger_source,
+                            "worldline_id": str(resolved_worldline_id),
+                        },
+                        request_json={
+                            "operation": "agent_runtime",
+                            "trigger_source": trigger_source,
+                            "retrieve_memory": retrieve_memory,
+                            "max_context_items": max_context_items,
+                            "create_memory": create_memory,
+                            "create_narrative_artifact": create_narrative_artifact,
+                            **provider_metadata,
+                        },
+                        invocation_kind=InvocationKind.AGENT_RUNTIME,
+                        actor_kind=InvocationActorKind.RUNTIME,
+                        agent_id=agent_id,
+                        actor_ref=RUNTIME_ACTOR_REF,
+                    )
+                )
+                invocation_id = result.invocation.id
+                text = (result.output_text or "").strip()
+                if text == "":
+                    raise ProviderConfigurationError("Runtime provider returned no text")
+                completion = ProviderCompletion(text=text, raw_response=result.output_json)
+                InvocationLedgerService(self._session).link_runtime_run(
+                    AgentRuntimeRunInvocationLinkCreate(
+                        world_id=world_id,
+                        worldline_id=resolved_worldline_id,
+                        agent_runtime_run_id=run_model.id,
+                        model_invocation_id=invocation_id,
+                        invocation_role=InvocationRole.PRIMARY,
+                        sequence_index=0,
+                    )
+                )
             latency_ms = _latency_ms(provider_started_at)
             run_model.status = "succeeded"
             run_model.response_text = completion.text
             run_model.finished_at = datetime.now(UTC)
-            InvocationLedgerService(self._session).update_status(
-                world_id,
-                invocation.id,
-                InvocationStatusUpdate(
-                    status=InvocationStatus.SUCCEEDED,
-                    output_text=completion.text,
-                    response_metadata_json=completion.raw_response,
-                    latency_ms=latency_ms,
-                ),
-            )
-            PromptSnapshotService(self._session).update_snapshot_for_invocation(
-                invocation.id,
-                PromptSnapshotUpdate(
-                    raw_response_json=completion.raw_response,
-                    raw_output_text=completion.text,
-                ),
-            )
             run_model.diagnostics = {
-                "provider_profile_id": str(provider_profile.id),
-                "provider_type": provider_profile.provider_type.value,
-                "profile_key": provider_profile.profile_key,
-                "model_invocation_id": str(invocation.id),
+                **provider_metadata,
+                "model_invocation_id": None if invocation_id is None else str(invocation_id),
+                "latency_ms": latency_ms,
                 **prompt_context,
             }
             self._record_diagnostic(
@@ -348,14 +412,13 @@ class AgentRuntimeOrchestrator:
                 message="Agent runtime run succeeded.",
                 details={
                     "trigger_source": trigger_source,
-                    "provider_type": provider_profile.provider_type.value,
-                    "profile_key": provider_profile.profile_key,
+                    **provider_metadata,
                     **prompt_context,
                 },
                 world_id=world_id,
                 agent_id=agent_id,
                 run_id=run_model.id,
-                provider_profile_id=provider_profile.id,
+                provider_profile_id=_runtime_provider_profile_id(provider),
             )
             created_event = self._append_event(
                 world_id=world_id,
@@ -364,7 +427,7 @@ class AgentRuntimeOrchestrator:
                 payload={
                     "agent_id": str(agent_id),
                     "run_id": str(run_model.id),
-                    "provider_profile_id": str(provider_profile.id),
+                    **provider_metadata,
                 },
                 actor_ref=RUNTIME_ACTOR_REF,
             )
@@ -422,7 +485,7 @@ class AgentRuntimeOrchestrator:
                         world_id=world_id,
                         agent_id=agent_id,
                         run_id=run_model.id,
-                        provider_profile_id=provider_profile.id,
+                        provider_profile_id=_runtime_provider_profile_id(provider),
                     )
 
             if create_narrative_artifact:
@@ -455,21 +518,29 @@ class AgentRuntimeOrchestrator:
         except Exception as exc:
             run_model.status = "failed"
             run_model.finished_at = datetime.now(UTC)
-            InvocationLedgerService(self._session).update_status(
-                world_id,
-                invocation.id,
-                InvocationStatusUpdate(
-                    status=InvocationStatus.FAILED,
-                    error_text=str(exc),
-                    latency_ms=_latency_ms(started_at),
-                ),
-            )
+            if invocation_id is None:
+                invocation_id = self._invocation_id_for_trace(world_id, trace_id)
+            if invocation_id is not None:
+                InvocationLedgerService(self._session).update_status(
+                    world_id,
+                    invocation_id,
+                    InvocationStatusUpdate(
+                        status=InvocationStatus.FAILED,
+                        error_text=str(exc),
+                        latency_ms=_latency_ms(started_at),
+                    ),
+                )
+                if provider.uses_provider_execution:
+                    self._link_runtime_invocation(
+                        world_id=world_id,
+                        worldline_id=resolved_worldline_id,
+                        run_id=run_model.id,
+                        invocation_id=invocation_id,
+                    )
             run_model.diagnostics = {
                 "error": str(exc),
-                "provider_profile_id": None
-                if provider_profile is None
-                else str(provider_profile.id),
-                "model_invocation_id": str(invocation.id),
+                **provider_metadata,
+                "model_invocation_id": None if invocation_id is None else str(invocation_id),
                 **prompt_context,
             }
             self._record_diagnostic(
@@ -481,14 +552,15 @@ class AgentRuntimeOrchestrator:
                     "trigger_source": trigger_source,
                     "error": str(exc),
                     "error_type": type(exc).__name__,
+                    **provider_metadata,
                     **prompt_context,
                 },
                 world_id=world_id,
                 agent_id=agent_id,
                 run_id=run_model.id,
-                provider_profile_id=None if provider_profile is None else provider_profile.id,
+                provider_profile_id=_runtime_provider_profile_id(provider),
             )
-            if isinstance(exc, ProviderError):
+            if isinstance(exc, ProviderError | ProviderExecutionError):
                 self._record_diagnostic(
                     severity=DiagnosticSeverity.ERROR,
                     component=DiagnosticComponent.PROVIDER,
@@ -498,11 +570,12 @@ class AgentRuntimeOrchestrator:
                         "trigger_source": trigger_source,
                         "error": str(exc),
                         "error_type": type(exc).__name__,
+                        **provider_metadata,
                     },
                     world_id=world_id,
                     agent_id=agent_id,
                     run_id=run_model.id,
-                    provider_profile_id=None if provider_profile is None else provider_profile.id,
+                    provider_profile_id=_runtime_provider_profile_id(provider),
                 )
             failed_event = self._append_event(
                 world_id=world_id,
@@ -635,21 +708,107 @@ class AgentRuntimeOrchestrator:
             raise LookupError("Agent not found")
         return agent
 
-    def _resolve_profile(
+    def _resolve_provider(
         self,
         agent: Agent,
         provider_profile_id: uuid.UUID | None,
-    ) -> ProviderProfileRecord | None:
+        *,
+        world_id: uuid.UUID,
+    ) -> _ResolvedRuntimeProvider:
         profile_from_agent = agent.config.get("provider_profile_id")
-        resolved_profile_id = provider_profile_id
-        if resolved_profile_id is None and isinstance(profile_from_agent, str):
+        resolved_provider_id = provider_profile_id
+        if resolved_provider_id is None and isinstance(profile_from_agent, str):
             try:
-                resolved_profile_id = uuid.UUID(profile_from_agent)
+                resolved_provider_id = uuid.UUID(profile_from_agent)
             except ValueError:
-                resolved_profile_id = None
-        if resolved_profile_id is not None:
-            return self._profile_service.get_profile(resolved_profile_id)
-        return self._profile_service.first_enabled_profile()
+                resolved_provider_id = None
+        if resolved_provider_id is not None:
+            profile = self._profile_service.get_profile(resolved_provider_id)
+            if profile is not None:
+                return _ResolvedRuntimeProvider(
+                    id=profile.id,
+                    provider_key=profile.profile_key,
+                    legacy_profile=profile,
+                )
+            provider = ProviderRegistryService(self._session).get_provider(
+                world_id,
+                resolved_provider_id,
+                platform_admin=True,
+                include_hidden=True,
+            )
+            if provider is None:
+                raise ProviderConfigurationError("Configured runtime provider was not found")
+            if provider.provider_kind != ProviderKind.TEXT_GENERATION:
+                raise ProviderConfigurationError(
+                    "Runtime provider must have provider_kind=text_generation",
+                )
+            return _ResolvedRuntimeProvider(
+                id=provider.id,
+                provider_key=provider.provider_key,
+                provider_integration=provider,
+            )
+        try:
+            provider = ProviderRegistryService(self._session).resolve_provider_for_capability(
+                world_id,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                capability_key="text.generate",
+                platform_admin=True,
+                include_hidden=True,
+            )
+        except ProviderNotFoundError as exc:
+            profile = self._profile_service.first_enabled_profile()
+            if profile is not None:
+                return _ResolvedRuntimeProvider(
+                    id=profile.id,
+                    provider_key=profile.profile_key,
+                    legacy_profile=profile,
+                )
+            raise ProviderConfigurationError("No enabled runtime provider is available") from exc
+        return _ResolvedRuntimeProvider(
+            id=provider.id,
+            provider_key=provider.provider_key,
+            provider_integration=provider,
+        )
+
+    def _link_runtime_invocation(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        run_id: uuid.UUID,
+        invocation_id: uuid.UUID,
+    ) -> None:
+        existing = self._session.scalars(
+            select(AgentRuntimeRunModelInvocation).where(
+                AgentRuntimeRunModelInvocation.agent_runtime_run_id == run_id,
+                AgentRuntimeRunModelInvocation.model_invocation_id == invocation_id,
+            )
+        ).one_or_none()
+        if existing is not None:
+            return
+        InvocationLedgerService(self._session).link_runtime_run(
+            AgentRuntimeRunInvocationLinkCreate(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_runtime_run_id=run_id,
+                model_invocation_id=invocation_id,
+                invocation_role=InvocationRole.PRIMARY,
+                sequence_index=0,
+            )
+        )
+
+    def _invocation_id_for_trace(
+        self,
+        world_id: uuid.UUID,
+        trace_id: uuid.UUID,
+    ) -> uuid.UUID | None:
+        model = self._session.scalars(
+            select(ModelInvocation).where(
+                ModelInvocation.world_id == world_id,
+                ModelInvocation.trace_id == trace_id,
+            )
+        ).one_or_none()
+        return None if model is None else model.id
 
     def _due_rules_plugin(self, world_id: uuid.UUID) -> WorldRulesPlugin:
         world = self._world_or_404(world_id)
@@ -810,15 +969,60 @@ def _run_record(model: AgentRuntimeRun) -> AgentRunExecution:
     )
 
 
-def _invocation_provider_kind(
-    provider_profile: ProviderProfileRecord | None,
-) -> InvocationProviderKind:
+def _invocation_provider_kind(provider: _ResolvedRuntimeProvider) -> InvocationProviderKind:
+    if provider.provider_integration is not None:
+        return invocation_provider_kind_for_adapter(
+            provider.provider_integration.provider_kind,
+            provider.provider_integration.adapter_kind,
+        )
+    provider_profile = provider.legacy_profile
     if provider_profile is None:
         return InvocationProviderKind.OTHER
     try:
         return InvocationProviderKind(provider_profile.provider_type.value)
     except ValueError:
         return InvocationProviderKind.OTHER
+
+
+def _runtime_provider_profile_id(provider: _ResolvedRuntimeProvider) -> uuid.UUID | None:
+    return None if provider.legacy_profile is None else provider.legacy_profile.id
+
+
+def _runtime_provider_metadata(provider: _ResolvedRuntimeProvider) -> dict[str, str]:
+    if provider.provider_integration is not None:
+        return {
+            "provider_source": "provider_integration",
+            "provider_integration_id": str(provider.provider_integration.id),
+            "provider_key": provider.provider_integration.provider_key,
+            "provider_kind": provider.provider_integration.provider_kind.value,
+            "adapter_kind": provider.provider_integration.adapter_kind.value,
+        }
+    if provider.legacy_profile is not None:
+        return {
+            "provider_source": "legacy_profile",
+            "provider_profile_id": str(provider.legacy_profile.id),
+            "provider_key": provider.legacy_profile.profile_key,
+            "provider_type": provider.legacy_profile.provider_type.value,
+        }
+    return {"provider_source": "unresolved"}
+
+
+def _runtime_provider_prompt_json(provider: _ResolvedRuntimeProvider) -> dict[str, object]:
+    if provider.provider_integration is not None:
+        return {
+            "provider_integration_id": str(provider.provider_integration.id),
+            "provider_kind": provider.provider_integration.provider_kind.value,
+            "adapter_kind": provider.provider_integration.adapter_kind.value,
+            "model_name": provider.provider_integration.default_params_json.get("model")
+            or provider.provider_integration.default_params_json.get("model_name"),
+        }
+    if provider.legacy_profile is not None:
+        return {
+            "provider_profile_id": str(provider.legacy_profile.id),
+            "provider_type": provider.legacy_profile.provider_type.value,
+            "model_name": provider.legacy_profile.model_name,
+        }
+    return {}
 
 
 def _runtime_prompt_summary(prompt_text: str) -> str:

@@ -31,6 +31,7 @@ from noveland.media.models import (
 )
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
+from noveland.providers.adapters.openai_image import ImageAdapterResult
 from noveland.providers.budget import ProviderBudgetService
 from noveland.providers.contracts import (
     ProviderAdapterKind,
@@ -822,6 +823,58 @@ def test_openai_compatible_text_dry_run_writes_ledger_without_secret() -> None:
         }
         assert "MISSING_OPENAI_API_KEY" not in str(invocation.request_params_json)
         assert "MISSING_OPENAI_API_KEY" not in str(snapshot.raw_request_json)
+
+
+def test_custom_http_image_provider_uses_compatible_image_execution(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.IMAGE_GENERATION,
+                adapter_kind=ProviderAdapterKind.CUSTOM_HTTP,
+                provider_key="custom-http-image",
+                display_name="Custom HTTP Image",
+                base_url="https://gateway.example/v1",
+                default_params_json={"response_format": "b64_json"},
+            )
+        )
+        service = ProviderExecutionService(session, LocalMediaObjectStorage(tmp_path))
+        calls: list[dict[str, object]] = []
+
+        def execute_custom_image(**kwargs: object) -> ImageAdapterResult:
+            calls.append(kwargs)
+            return ImageAdapterResult(
+                output_text="custom revised prompt",
+                output_json={"media": "image"},
+                raw_response_json={"data": [{"b64_json": "stub"}]},
+                media_bytes=b"custom-http-image",
+                media_mime_type="image/png",
+                media_filename="custom-http-image.png",
+            )
+
+        monkeypatch.setattr(service._openai_compatible_image, "execute", execute_custom_image)
+        result = service.execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider.id,
+                input_text="draw through custom http",
+            )
+        )
+        session.commit()
+
+    assert len(calls) == 1
+    assert calls[0]["base_url"] == "https://gateway.example/v1"
+    assert calls[0]["input_text"] == "draw through custom http"
+    assert result.output_asset is not None
+    assert result.output_objects[0].mime_type == "image/png"
 
 
 def test_anthropic_compatible_text_dry_run_writes_ledger_without_secret() -> None:

@@ -40,6 +40,7 @@ from noveland.providers.contracts import (
     ProviderKind,
 )
 from noveland.providers.registry import ProviderRegistryService, ProviderValidationError
+from noveland.providers.routing import equivalent_capability_keys
 from noveland.providers.service import ProviderExecutionService
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy.orm import Session
@@ -484,9 +485,23 @@ def _input_create(
 
 
 def _capability_true(capabilities: Iterable[ProviderCapabilityRead], key: str) -> bool:
+    accepted_keys = set(equivalent_capability_keys(key))
+    if key in {"supports_image_edit", "image.edit"}:
+        accepted_keys.add("image.generate")
     for capability in capabilities:
-        if capability.capability_key != key:
+        if capability.capability_key not in accepted_keys:
             continue
+        if (
+            key in {"supports_image_edit", "image.edit"}
+            and capability.capability_key == "image.generate"
+        ):
+            return bool(
+                capability.capability_json.get("value", True)
+                and (
+                    capability.capability_json.get("edit", False)
+                    or capability.capability_json.get("image_to_image", False)
+                )
+            )
         value = capability.capability_json.get("value", True)
         return bool(value)
     return False

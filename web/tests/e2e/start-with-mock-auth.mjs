@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 
@@ -18,6 +17,7 @@ const agentGuideId = "30000000-0000-4000-8000-000000000001";
 const membershipOwnerId = "40000000-0000-4000-8000-000000000001";
 const membershipMemberId = "40000000-0000-4000-8000-000000000002";
 const providerOpenAiId = "71000000-0000-4000-8000-000000000001";
+const providerMimoTtsId = "71000000-0000-4000-8000-000000000002";
 const memoryProfilePrimaryId = "71500000-0000-4000-8000-000000000001";
 const seedConversationId = "76000000-0000-4000-8000-000000000001";
 const seedSnapshotId = "74500000-0000-4000-8000-000000000001";
@@ -224,6 +224,70 @@ const locationEdges = [
     updated_at: "2026-04-17T00:00:00.000Z",
   },
 ];
+const providerIntegrations = [
+  providerIntegration(providerOpenAiId, "text_generation", "openai_compatible", "mimo-v2-5"),
+  providerIntegration(providerMimoTtsId, "text_to_speech", "mimo_tts", "mimo-v2-5-tts"),
+];
+const providerCapabilities = new Map([
+  [
+    providerOpenAiId,
+    [
+      providerCapability(providerOpenAiId, "text.generate", {
+        value: true,
+        model_discovery: true,
+      }),
+    ],
+  ],
+  [
+    providerMimoTtsId,
+    [
+      providerCapability(providerMimoTtsId, "speech.tts", {
+        value: true,
+        model_discovery: true,
+      }),
+    ],
+  ],
+]);
+const providerTemplates = [
+  {
+    template_key: "openai-compatible-llm",
+    display_name: "OpenAI-compatible LLM",
+    provider_kind: "text_generation",
+    adapter_kind: "openai_compatible",
+    description: "Chat/completions-compatible text provider with custom base URL.",
+    base_url_placeholder: "https://gateway.example/v1",
+    model_name_placeholder: "model-name",
+    auth_ref_placeholder: "env:OPENAI_API_KEY",
+    config_json: { model_discovery_path: "/models", chat_completions_path: "/chat/completions" },
+    default_params_json: { temperature: 0.7 },
+    capabilities: [{ capability_key: "text.generate", capability_json: { value: true } }],
+    model_discovery: { strategy: "openai_models", path: "/models" },
+  },
+  {
+    template_key: "mimo-v2-5-tts",
+    display_name: "MiMo V2.5 TTS",
+    provider_kind: "text_to_speech",
+    adapter_kind: "mimo_tts",
+    description: "MiMo-compatible TTS routed through a configurable endpoint or gateway.",
+    base_url_placeholder: "https://gateway.example",
+    model_name_placeholder: "mimo-tts-model",
+    auth_ref_placeholder: "env:MIMO_API_KEY",
+    config_json: { endpoint: "/tts", model_discovery_path: "/models" },
+    default_params_json: { output_format: "wav" },
+    capabilities: [{ capability_key: "speech.tts", capability_json: { value: true } }],
+    model_discovery: { strategy: "generic_models", path: "/models" },
+  },
+];
+const mediaAssets = [];
+const mediaJobs = [];
+const mediaReferences = [];
+const spriteSets = [];
+const sceneBackgrounds = [];
+const voiceProfiles = [];
+const speechStyleMappings = [];
+const speechTranscripts = [];
+const agentVoiceProfileBindings = [];
+const modelInvocations = [];
 const organizations = [
   {
     id: "81000000-0000-4000-8000-000000000001",
@@ -1799,7 +1863,19 @@ const readerMediaDescriptors = [
   },
 ];
 
-const mockServer = createServer(async (request, response) => {
+const mockServer = createServer((request, response) => {
+  void handleMockRequest(request, response).catch((error) => {
+    const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
+    console.error("mock uncaught", request.method, url.pathname, error);
+    if (!response.headersSent) {
+      sendJson(response, 500, { detail: "mock server error" });
+      return;
+    }
+    response.destroy(error instanceof Error ? error : undefined);
+  });
+});
+
+async function handleMockRequest(request, response) {
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
   if (request.method === "GET" && url.pathname === "/auth/csrf") {
     sendJson(response, 200, { csrf_token: validCsrf }, [csrfCookie()]);
@@ -1984,11 +2060,9 @@ const mockServer = createServer(async (request, response) => {
   }
 
   sendJson(response, 404, { detail: "not found" });
-});
+}
 
 mockServer.listen(mockPort, "127.0.0.1", () => {
-  rmSync(new URL("../../.next/dev", import.meta.url), { recursive: true, force: true });
-
   const nextProcess = spawn(
     "npm",
     ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(nextPort)],
@@ -2109,6 +2183,26 @@ async function handleWorldResource(request, response, url) {
     await handleAgents(request, response, currentSubject, worldId, segments[3]);
     return;
   }
+  if (resource === "providers") {
+    handleProviderIntegrations(request, response, currentSubject, worldId, segments.slice(3));
+    return;
+  }
+  if (resource === "media") {
+    handleMediaResource(request, response, currentSubject, worldId, segments.slice(3), url);
+    return;
+  }
+  if (resource === "visual") {
+    handleVisualResource(request, response, currentSubject, worldId, segments.slice(3), url);
+    return;
+  }
+  if (resource === "speech") {
+    handleSpeechResource(request, response, currentSubject, worldId, segments.slice(3), url);
+    return;
+  }
+  if (resource === "model-invocations") {
+    handleModelInvocations(request, response, currentSubject, worldId, segments.slice(3));
+    return;
+  }
   if (resource === "memberships") {
     await handleMemberships(request, response, currentSubject, worldId, segments[3]);
     return;
@@ -2127,6 +2221,10 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "gm") {
     await handleGM(request, response, currentSubject, worldId, segments[3], segments[4], segments[5]);
+    return;
+  }
+  if (resource === "calendar") {
+    handleWorldCalendar(request, response, currentSubject, worldId, segments[3]);
     return;
   }
   if (resource === "resolution-rules") {
@@ -2407,6 +2505,236 @@ async function handleWorldItem(request, response, currentSubject, world) {
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
+}
+
+function handleProviderIntegrations(request, response, currentSubject, worldId, segments) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method !== "GET") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+  const [providerId, child] = segments;
+  if (providerId === undefined) {
+    sendJson(response, 200, providerIntegrations.filter((provider) => provider.world_id === worldId));
+    return;
+  }
+  if (providerId === "templates") {
+    sendJson(response, 200, providerTemplates);
+    return;
+  }
+  const provider = providerIntegrations.find((item) => item.id === providerId && item.world_id === worldId);
+  if (provider === undefined) {
+    sendJson(response, 404, { detail: "not found" });
+    return;
+  }
+  if (child === undefined) {
+    sendJson(response, 200, provider);
+    return;
+  }
+  if (child === "capabilities") {
+    sendJson(response, 200, providerCapabilities.get(providerId) ?? []);
+    return;
+  }
+  if (child === "health-checks") {
+    sendJson(response, 200, []);
+    return;
+  }
+  if (child === "reliability") {
+    sendJson(response, 200, {
+      provider_id: providerId,
+      health_status: "healthy",
+      degraded: false,
+      recent_failure_count: 0,
+      fallback_candidates: [],
+      metadata_json: {},
+    });
+    return;
+  }
+  sendJson(response, 404, { detail: "not found" });
+}
+
+function handleMediaResource(request, response, currentSubject, worldId, segments, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method !== "GET") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+  const [resource, resourceId, child] = segments;
+  if (resource === "assets" && resourceId === undefined) {
+    const assetKind = url.searchParams.get("asset_kind");
+    sendJson(
+      response,
+      200,
+      mediaAssets.filter(
+        (asset) =>
+          asset.world_id === worldId && (assetKind === null || asset.asset_kind === assetKind),
+      ),
+    );
+    return;
+  }
+  if (resource === "assets" && resourceId !== undefined && child === undefined) {
+    const asset = mediaAssets.find((item) => item.id === resourceId && item.world_id === worldId);
+    sendJson(response, asset === undefined ? 404 : 200, asset ?? { detail: "not found" });
+    return;
+  }
+  if (resource === "assets" && resourceId !== undefined && child === "objects") {
+    sendJson(response, 200, []);
+    return;
+  }
+  if (resource === "assets" && resourceId !== undefined && child === "references") {
+    sendJson(response, 200, {
+      asset_id: resourceId,
+      contexts: [],
+      tags: [],
+      collections: [],
+      input_count: 0,
+      output_count: 0,
+      tag_count: 0,
+      collection_count: 0,
+    });
+    return;
+  }
+  if (resource === "jobs") {
+    sendJson(response, 200, mediaJobs.filter((job) => job.world_id === worldId));
+    return;
+  }
+  if (resource === "references") {
+    sendJson(response, 200, mediaReferences.filter((reference) => reference.world_id === worldId));
+    return;
+  }
+  if (resource === "collections") {
+    sendJson(response, 200, []);
+    return;
+  }
+  sendJson(response, 404, { detail: "not found" });
+}
+
+function handleVisualResource(request, response, currentSubject, worldId, segments) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method !== "GET") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+  const [resource, resourceId, child] = segments;
+  if (resource === "sprite-sets" && resourceId === undefined) {
+    sendJson(response, 200, spriteSets.filter((set) => set.world_id === worldId));
+    return;
+  }
+  if (resource === "sprite-sets" && child === "variants") {
+    sendJson(response, 200, []);
+    return;
+  }
+  if (resource === "backgrounds") {
+    sendJson(response, 200, sceneBackgrounds.filter((background) => background.world_id === worldId));
+    return;
+  }
+  sendJson(response, 404, { detail: "not found" });
+}
+
+function handleSpeechResource(request, response, currentSubject, worldId, segments) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method !== "GET") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+  const [resource] = segments;
+  if (resource === "voice-profiles") {
+    sendJson(response, 200, voiceProfiles.filter((profile) => profile.world_id === worldId));
+    return;
+  }
+  if (resource === "style-mappings") {
+    sendJson(response, 200, speechStyleMappings.filter((mapping) => mapping.world_id === worldId));
+    return;
+  }
+  if (resource === "transcripts") {
+    sendJson(response, 200, speechTranscripts.filter((transcript) => transcript.world_id === worldId));
+    return;
+  }
+  sendJson(response, 404, { detail: "not found" });
+}
+
+function handleAgentVoiceProfiles(request, response, currentSubject, worldId, agentId) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method !== "GET") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+  sendJson(
+    response,
+    200,
+    agentVoiceProfileBindings.filter(
+      (binding) => binding.world_id === worldId && binding.agent_id === agentId,
+    ),
+  );
+}
+
+function handleModelInvocations(request, response, currentSubject, worldId, segments) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method !== "GET") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+  const [invocationId, child] = segments;
+  if (invocationId === undefined) {
+    sendJson(response, 200, {
+      invocations: modelInvocations.filter((invocation) => invocation.world_id === worldId),
+    });
+    return;
+  }
+  const invocation = modelInvocations.find((item) => item.id === invocationId && item.world_id === worldId);
+  if (invocation === undefined) {
+    sendJson(response, 404, { detail: "not found" });
+    return;
+  }
+  if (child === undefined) {
+    sendJson(response, 200, invocation);
+    return;
+  }
+  if (child === "tags") {
+    sendJson(response, 200, []);
+    return;
+  }
+  if (child === "prompt-snapshot") {
+    sendJson(response, 200, null);
+    return;
+  }
+  sendJson(response, 404, { detail: "not found" });
+}
+
+function handleWorldCalendar(request, response, currentSubject, worldId, action) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && action === "conflicts") {
+    sendJson(response, 200, {
+      world_id: worldId,
+      start_world_time: "2030-01-01T00:00:00.000Z",
+      horizon_hours: 168,
+      conflict_count: 0,
+      conflicts: [],
+    });
+    return;
+  }
+  sendJson(response, 404, { detail: "not found" });
 }
 
 async function handleWorldBible(request, response, currentSubject, worldId) {
@@ -5152,6 +5480,10 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
     }
     if (segments[4] === "runs") {
       handleAgentRuns(request, response, currentSubject, worldId, agentId);
+      return;
+    }
+    if (segments[4] === "voice-profiles") {
+      handleAgentVoiceProfiles(request, response, currentSubject, worldId, agentId);
       return;
     }
     if (segments[4] === "relationships") {
@@ -8480,6 +8812,39 @@ function primaryWorldlineFor(worldId) {
   };
 }
 
+function providerIntegration(id, providerKind, adapterKind, providerKey) {
+  return {
+    id,
+    world_id: worldOneId,
+    scope_kind: "world",
+    scope_key: `world:${worldOneId}`,
+    provider_kind: providerKind,
+    adapter_kind: adapterKind,
+    provider_key: providerKey,
+    display_name: providerKey,
+    base_url: "https://gateway.example/v1",
+    auth_ref: "env:MIMO_API_KEY",
+    auth_ref_configured: true,
+    config_json: {},
+    default_params_json: { model: providerKey },
+    status: "active",
+    visibility: "world_admin",
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  };
+}
+
+function providerCapability(providerId, capabilityKey, capabilityJson) {
+  return {
+    id: randomUUID(),
+    provider_integration_id: providerId,
+    capability_key: capabilityKey,
+    capability_json: capabilityJson,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  };
+}
+
 function hasValidCsrf(request) {
   return hasCookie(request, "noveland_csrf", validCsrf) && request.headers["x-csrf-token"] === validCsrf;
 }
@@ -8502,11 +8867,14 @@ function tinyWavBytes() {
 }
 
 function sendJson(response, status, body, setCookie = []) {
+  const payload = JSON.stringify(body);
   response.writeHead(status, {
     "content-type": "application/json",
+    "content-length": Buffer.byteLength(payload),
+    connection: "close",
     ...(setCookie.length > 0 ? { "set-cookie": setCookie } : {}),
   });
-  response.end(JSON.stringify(body));
+  response.end(payload);
 }
 
 function sendSseEnvelope(response, envelope) {

@@ -527,7 +527,8 @@ class ConversationService:
             )
 
             completed_turn_count = prior_agent_turn_count + 1
-            if completed_turn_count >= session_model.max_turns:
+            max_turn_budget = policy.max_turn_budget or session_model.max_turns
+            if completed_turn_count >= min(session_model.max_turns, max_turn_budget):
                 self._mark_session_completed(session_model)
             elif self._loop_guard_triggered(session_model.id, policy=policy):
                 self._mark_session_stopped(

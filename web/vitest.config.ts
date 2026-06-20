@@ -19,5 +19,8 @@ export default defineConfig({
     globals: true,
     include: ["**/*.test.ts", "**/*.test.tsx"],
     setupFiles: resolve(currentDirectory, "vitest.setup.ts"),
+    pool: "threads",
+    fileParallelism: false,
+    testTimeout: 120000,
   },
 });

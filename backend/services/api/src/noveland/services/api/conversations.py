@@ -51,6 +51,7 @@ from noveland.plugins.builtins import get_builtin_plugin_registry
 from noveland.plugins.categories import PluginCategory
 from noveland.plugins.constants import BUILTIN_DEFAULT_NARRATIVE_WRITER
 from noveland.plugins.errors import PluginConfigValidationError, PluginNotFoundError
+from noveland.providers.registry import ProviderRegistryService
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
     WorldAccessContext,
@@ -382,7 +383,11 @@ def create_conversation(
 ) -> ConversationSessionResponse:
     require_csrf(request)
     _validate_scene_reference(db_session, context.world_id, conversation_create.scene_id)
-    _validate_writer_config_binding(db_session, conversation_create.writer_config)
+    _validate_writer_config_binding(
+        db_session,
+        context.world_id,
+        conversation_create.writer_config,
+    )
     try:
         writer_config = _writer_config_with_group_context(
             conversation_create.writer_config,
@@ -434,7 +439,11 @@ def update_conversation(
 ) -> ConversationSessionResponse:
     require_csrf(request)
     if conversation_update.writer_config is not None:
-        _validate_writer_config_binding(db_session, conversation_update.writer_config)
+        _validate_writer_config_binding(
+            db_session,
+            context.world_id,
+            conversation_update.writer_config,
+        )
     try:
         writer_config = None
         if conversation_update.writer_config is not None:
@@ -1345,14 +1354,23 @@ def _http_error_for_conversation_error(detail: str) -> HTTPException:
 
 def _validate_writer_config_binding(
     db_session: Session,
+    world_id: uuid.UUID,
     writer_config: ConversationWriterConfigRequest,
 ) -> None:
     if writer_config.provider_profile_id is not None:
         profile = db_session.get(ProviderProfile, writer_config.provider_profile_id)
+        provider = None
         if profile is None:
+            provider = ProviderRegistryService(db_session).get_provider(
+                world_id,
+                writer_config.provider_profile_id,
+                platform_admin=True,
+                include_hidden=True,
+            )
+        if profile is None and provider is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Provider profile not found",
+                detail="Provider profile or integration not found",
             )
     registry = get_builtin_plugin_registry()
     try:

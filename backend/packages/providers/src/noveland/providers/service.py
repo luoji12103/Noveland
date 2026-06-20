@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from noveland.invocations.contracts import (
-    InvocationActorKind,
     InvocationRecordCreate,
     InvocationRedactionStatus,
     InvocationRetentionPolicy,
@@ -217,11 +216,16 @@ class ProviderExecutionService:
             InvocationRecordCreate(
                 world_id=request.world_id,
                 worldline_id=worldline_id,
-                invocation_kind=invocation_kind_for_provider(provider.provider_kind),
-                actor_kind=InvocationActorKind.SERVICE,
+                trace_id=request.trace_id,
+                invocation_kind=request.invocation_kind
+                or invocation_kind_for_provider(provider.provider_kind),
+                actor_kind=request.actor_kind,
                 actor_ref=request.actor_ref or "service:provider-execution",
                 media_job_id=request.media_job_id,
                 media_asset_id=request.media_asset_id,
+                agent_id=request.agent_id,
+                conversation_id=request.conversation_id,
+                turn_id=request.turn_id,
                 provider_kind=invocation_provider_kind_for_adapter(
                     provider.provider_kind,
                     provider.adapter_kind,
@@ -451,6 +455,11 @@ class ProviderExecutionService:
         if adapter_kind == ProviderAdapterKind.OPENAI_COMPATIBLE:
             if provider_kind == ProviderKind.TEXT_GENERATION:
                 return self._openai_text
+            return self._openai_compatible_image
+        if adapter_kind == ProviderAdapterKind.CUSTOM_HTTP and provider_kind in {
+            ProviderKind.IMAGE_GENERATION,
+            ProviderKind.IMAGE_EDITING,
+        }:
             return self._openai_compatible_image
         if adapter_kind in {
             ProviderAdapterKind.ANTHROPIC,
@@ -811,6 +820,7 @@ def _adapter_is_implemented(adapter_kind: ProviderAdapterKind) -> bool:
         ProviderAdapterKind.ANTHROPIC,
         ProviderAdapterKind.ANTHROPIC_COMPATIBLE,
         ProviderAdapterKind.COMFYUI,
+        ProviderAdapterKind.CUSTOM_HTTP,
         ProviderAdapterKind.MIMO_TTS,
         ProviderAdapterKind.MIMO_ASR,
         ProviderAdapterKind.OMNIVOICE,

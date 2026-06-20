@@ -118,6 +118,44 @@ def test_manual_chain_round_robin_and_completion() -> None:
     assert turns[2].output_text == "Second response"
 
 
+def test_finalize_turn_completes_when_max_turn_budget_is_reached() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    first_agent_id = _seed_agent(engine, world_id, "first")
+
+    with Session(engine) as session:
+        service = ConversationService(session)
+        created = service.create_session(
+            ConversationSessionCreate(
+                world_id=world_id,
+                session_key="budget-chat",
+                title="Budget chat",
+                scope_type=ConversationScopeType.WORLD,
+                mode=ConversationMode.MANUAL_CHAIN,
+                max_turns=3,
+                policy=_default_policy().model_copy(update={"max_turn_budget": 1}),
+                writer_config=_default_writer_config(),
+            ),
+        )
+        service.replace_participants(
+            world_id,
+            created.id,
+            [ConversationParticipantDefinition(agent_id=first_agent_id, turn_order=0)],
+        )
+
+        prepared = service.prepare_next_turn(world_id, created.id)
+        result = service.finalize_turn(
+            prepared,
+            response_text="First response",
+            run_id=None,
+            diagnostics={},
+            succeeded=True,
+        )
+
+    assert result.session.status == ConversationSessionStatus.COMPLETED
+    assert result.session.terminal_reason == ConversationTerminalReason.MAX_TURNS_REACHED
+
+
 def test_conversation_service_scopes_session_and_events_to_worldline() -> None:
     engine = _engine()
     world_id = _seed_world(engine)

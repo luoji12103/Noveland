@@ -50,6 +50,21 @@ COMPATIBLE_PROVIDER_KINDS: Mapping[ProviderAdapterKind, set[ProviderKind]] = {
     ProviderAdapterKind.OTHER: set(ProviderKind),
 }
 
+CAPABILITY_KEY_ALIASES: Mapping[str, tuple[str, ...]] = {
+    "speech.tts": ("speech.tts", "supports_tts"),
+    "supports_tts": ("supports_tts", "speech.tts"),
+    "speech.asr": ("speech.asr", "supports_stt"),
+    "supports_stt": ("supports_stt", "speech.asr"),
+    "image.generate": ("image.generate", "supports_image_generation"),
+    "supports_image_generation": ("supports_image_generation", "image.generate"),
+    "image.edit": ("image.edit", "supports_image_edit"),
+    "supports_image_edit": ("supports_image_edit", "image.edit"),
+}
+
+
+def equivalent_capability_keys(capability_key: str) -> tuple[str, ...]:
+    return CAPABILITY_KEY_ALIASES.get(capability_key, (capability_key,))
+
 
 def validate_provider_adapter_compatibility(
     provider_kind: ProviderKind,

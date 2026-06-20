@@ -44,6 +44,15 @@ from noveland.memory.models import (
 )
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.observability.models import RuntimeDiagnosticEvent
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderIntegrationCreate,
+    ProviderKind,
+    ProviderScopeKind,
+    ProviderVisibility,
+)
+from noveland.providers.models import ProviderCapability, ProviderIntegration
+from noveland.providers.registry import ProviderRegistryService
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
@@ -689,6 +698,36 @@ def test_conversation_narrative_generation_and_listing(
     }
 
 
+def test_conversation_writer_config_accepts_provider_integration_id() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "provider-writer-world")
+    scene_id = _seed_scene(engine, world_id, "story-room")
+    provider_id = _seed_text_provider_integration(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    create_response = client.post(
+        f"/worlds/{world_id}/conversations",
+        json={
+            "session_key": "provider-writer-session",
+            "title": "Provider writer session",
+            "scope_type": "scene",
+            "mode": "manual_chain",
+            "scene_id": str(scene_id),
+            "max_turns": 1,
+            "policy": _policy_json(),
+            "writer_config": {
+                **_writer_config_json(),
+                "provider_profile_id": str(provider_id),
+            },
+        },
+    )
+
+    assert create_response.status_code == 201
+    assert create_response.json()["writer_config"]["provider_profile_id"] == str(provider_id)
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -705,6 +744,8 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, WorldMembership.__table__),
         cast(Table, Scene.__table__),
         cast(Table, ProviderProfile.__table__),
+        cast(Table, ProviderIntegration.__table__),
+        cast(Table, ProviderCapability.__table__),
         cast(Table, Agent.__table__),
         cast(Table, WorldBible.__table__),
         cast(Table, AgentRelationshipEdge.__table__),
@@ -896,6 +937,24 @@ def _seed_provider_profile(engine: Engine) -> uuid.UUID:
         )
         session.commit()
     return profile_id
+
+
+def _seed_text_provider_integration(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key=f"text-{uuid.uuid4().hex[:8]}",
+                display_name="Text Provider",
+                visibility=ProviderVisibility.WORLD_ADMIN,
+                capabilities=(),
+            ),
+        )
+        session.commit()
+        return provider.id
 
 
 def _seed_fork_worldline(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:

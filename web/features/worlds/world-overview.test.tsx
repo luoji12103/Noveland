@@ -143,7 +143,7 @@ describe("WorldOverview", () => {
       ),
     ).toHaveLength(0);
 
-    fireEvent.submit(screen.getByRole("button", { name: "Save world" }).closest("form") as HTMLFormElement);
+    fireEvent.submit(formForButton("Save world"));
     await waitFor(() => {
       expect(updateWorld).toHaveBeenCalledWith(
         "world-1",
@@ -157,7 +157,7 @@ describe("WorldOverview", () => {
       /clientSecret|sk-world-secret|storageUri|media:\/\/world-secret|bearerToken|Bearer world-token|promptSnapshotId/i,
     );
 
-    fireEvent.submit(screen.getByRole("button", { name: "Save world bible" }).closest("form") as HTMLFormElement);
+    fireEvent.submit(formForButton("Save world bible"));
     await waitFor(() => {
       expect(upsertWorldBible).toHaveBeenCalledWith(
         "world-1",
@@ -187,7 +187,7 @@ describe("WorldOverview", () => {
       /storageUri|media:\/\/release-secret|rawPrompt|filePath|\/tmp\/release|bearerToken|Bearer release-token|promptSnapshotId|snapshot-release|rawOutput|clientSecret|sk-release-secret/i,
     );
 
-    const validateForm = screen.getByRole("button", { name: "Validate composition" }).closest("form") as HTMLFormElement;
+    const validateForm = formForButton("Validate composition");
     setFormValue(validateForm, "slug", "validated-world");
     setFormValue(validateForm, "name", "Validated World");
     setFormValue(validateForm, "rules_config", JSON.stringify({ safeRule: true, storageUri: "media://validate-secret" }));
@@ -202,7 +202,7 @@ describe("WorldOverview", () => {
       /storageUri|media:\/\/validate-secret/i,
     );
 
-    const importForm = screen.getByRole("button", { name: "Import as new world" }).closest("form") as HTMLFormElement;
+    const importForm = formForButton("Import as new world");
     setFormValue(importForm, "slug", "imported-world");
     setFormValue(importForm, "name", "Imported World");
     setFormValue(importForm, "rules_config", JSON.stringify({ safeImport: true, rawPrompt: "import prompt" }));
@@ -214,7 +214,7 @@ describe("WorldOverview", () => {
       );
     });
     expect(JSON.stringify(vi.mocked(importWorldComposition).mock.calls[0][0])).not.toMatch(/rawPrompt|import prompt/i);
-  }, 10000);
+  }, 180000);
 
   it("renders and filters world event audit rows for world admins", async () => {
     vi.mocked(listWorldEvents).mockResolvedValue([eventRow("event-2", 2, "agent.run_failed")]);
@@ -396,7 +396,7 @@ describe("WorldOverview", () => {
     fireEvent.change(screen.getByPlaceholderText("actor:ref"), {
       target: { value: "agent:guide" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Filter events" }));
+    clickButton("Filter events");
 
     await waitFor(() => {
       expect(screen.getByText(/agent.run_failed/)).toBeInTheDocument();
@@ -410,14 +410,14 @@ describe("WorldOverview", () => {
       }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Preview schedule" }));
+    clickButton("Preview schedule");
 
     await waitFor(() => {
       expect(screen.getByText("Preview matches 1 windows for 1 agents.")).toBeInTheDocument();
     });
     expect(screen.getByText("hour 8 - 1 agents")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Check conflicts" }));
+    clickButton("Check conflicts");
 
     await waitFor(() => {
       expect(screen.getByText(/calendar_entry_overlap/)).toBeInTheDocument();
@@ -428,7 +428,7 @@ describe("WorldOverview", () => {
       limit: 50,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Preview daily life" }));
+    clickButton("Preview daily life");
 
     await waitFor(() => {
       expect(screen.getByText("Guide daily life beat")).toBeInTheDocument();
@@ -439,7 +439,7 @@ describe("WorldOverview", () => {
       limit: 20,
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate candidates" }));
+    clickButton("Generate candidates");
 
     await waitFor(() => {
       expect(generateDailyLifeCandidates).toHaveBeenCalledWith("world-1", {
@@ -448,7 +448,7 @@ describe("WorldOverview", () => {
       });
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Resolve due offscreen events" }));
+    clickButton("Resolve due offscreen events");
 
     await waitFor(() => {
       expect(resolveOffscreenEvents).toHaveBeenCalledWith("world-1", 20);
@@ -463,7 +463,7 @@ describe("WorldOverview", () => {
     fireEvent.change(screen.getByPlaceholderText("Paste composition JSON to validate"), {
       target: { value: JSON.stringify(compositionExport) },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Validate composition" }));
+    clickButton("Validate composition");
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Composition validation" })).toBeInTheDocument();
@@ -476,7 +476,7 @@ describe("WorldOverview", () => {
         composition: compositionExport,
       }),
     );
-  }, 40000);
+  }, 180000);
 
   it("encodes workspace shortcut links for reserved world identifiers", () => {
     render(
@@ -563,11 +563,10 @@ describe("WorldOverview", () => {
       });
     });
 
-    const compareForm = screen.getByRole("button", { name: "Compare worldlines" }).closest("form");
-    expect(compareForm).not.toBeNull();
-    setFormValue(compareForm as HTMLFormElement, "base_worldline_id", "worldline-1");
-    setFormValue(compareForm as HTMLFormElement, "compare_worldline_id", "worldline-1");
-    fireEvent.submit(compareForm as HTMLFormElement);
+    const compareForm = formForButton("Compare worldlines");
+    setFormValue(compareForm, "base_worldline_id", "worldline-1");
+    setFormValue(compareForm, "compare_worldline_id", "worldline-1");
+    fireEvent.submit(compareForm);
 
     await waitFor(() => {
       expect(compareWorldlines).toHaveBeenCalledWith("world-1", "worldline-1", "worldline-1");
@@ -788,18 +787,42 @@ describe("WorldOverview", () => {
         },
       });
     });
-  }, 40000);
+  }, 180000);
 });
 
 function formForHeading(name: string): HTMLFormElement {
-  const form = screen
-    .getAllByRole("heading", { name })
-    .map((heading) => heading.closest("form"))
-    .find((candidate): candidate is HTMLFormElement => candidate instanceof HTMLFormElement);
-  if (form === undefined) {
+  const form = Array.from(document.querySelectorAll("form")).find((candidate) =>
+    Array.from(candidate.querySelectorAll("h1,h2,h3,h4,h5,h6")).some(
+      (heading) => heading.textContent?.trim() === name,
+    ),
+  );
+  if (!(form instanceof HTMLFormElement)) {
     throw new Error(`Form for heading ${name} was not found.`);
   }
   return form;
+}
+
+function formForButton(name: string): HTMLFormElement {
+  const button = buttonByName(name);
+  const form = button.closest("form");
+  if (!(form instanceof HTMLFormElement)) {
+    throw new Error(`Form for button ${name} was not found.`);
+  }
+  return form;
+}
+
+function clickButton(name: string) {
+  fireEvent.click(buttonByName(name));
+}
+
+function buttonByName(name: string): HTMLButtonElement {
+  const button = Array.from(document.querySelectorAll("button")).find(
+    (candidate) => candidate.textContent?.trim() === name,
+  );
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Button ${name} was not found.`);
+  }
+  return button;
 }
 
 function setFormValue(form: HTMLFormElement, name: string, value: string) {

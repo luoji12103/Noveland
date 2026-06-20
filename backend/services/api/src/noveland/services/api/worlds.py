@@ -108,6 +108,7 @@ from noveland.plugins.errors import (
     PluginConfigValidationError,
     PluginNotFoundError,
 )
+from noveland.providers.registry import ProviderRegistryService
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
@@ -8072,7 +8073,11 @@ def create_agent(
         )
     explicit_provider_profile_id = agent_create.provider_profile_id
     if explicit_provider_profile_id is not None:
-        _provider_profile_or_404(db_session, explicit_provider_profile_id)
+        _provider_profile_or_integration_or_404(
+            db_session,
+            context.world_id,
+            explicit_provider_profile_id,
+        )
     agent = Agent(
         id=uuid.uuid4(),
         world_id=context.world_id,
@@ -8145,7 +8150,11 @@ def update_agent(
         agent.config = agent_update.config or {}
     if "provider_profile_id" in agent_update.model_fields_set:
         if agent_update.provider_profile_id is not None:
-            _provider_profile_or_404(db_session, agent_update.provider_profile_id)
+            _provider_profile_or_integration_or_404(
+                db_session,
+                context.world_id,
+                agent_update.provider_profile_id,
+            )
         agent.config = _agent_config_with_provider_profile_id(
             agent.config,
             agent_update.provider_profile_id,
@@ -10054,14 +10063,22 @@ def _source_preset_key(
     return None if preset is None else preset.preset_key
 
 
-def _provider_profile_or_404(
+def _provider_profile_or_integration_or_404(
     db_session: Session,
+    world_id: uuid.UUID,
     profile_id: uuid.UUID,
-) -> ProviderProfile:
+) -> None:
     profile = db_session.get(ProviderProfile, profile_id)
+    provider = None
     if profile is None:
+        provider = ProviderRegistryService(db_session).get_provider(
+            world_id,
+            profile_id,
+            platform_admin=True,
+            include_hidden=True,
+        )
+    if profile is None and provider is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    return profile
 
 
 def _validate_world_plugin_bindings(

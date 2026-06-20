@@ -26,6 +26,7 @@ from noveland.providers.contracts import (
     ProviderKind,
 )
 from noveland.providers.registry import ProviderRegistryService, ProviderValidationError
+from noveland.providers.routing import equivalent_capability_keys
 from noveland.providers.service import ProviderExecutionService
 from noveland.speech.contracts import (
     SpeechTranscriptCreate,
@@ -425,8 +426,9 @@ class SpeechService:
 
 
 def _capability_true(capabilities: list[ProviderCapabilityRead], key: str) -> bool:
+    accepted_keys = set(equivalent_capability_keys(key))
     for capability in capabilities:
-        if capability.capability_key != key:
+        if capability.capability_key not in accepted_keys:
             continue
         return bool(capability.capability_json.get("value", True))
     return False
