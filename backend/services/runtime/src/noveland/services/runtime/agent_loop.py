@@ -1001,6 +1001,7 @@ def _runtime_provider_metadata(provider: _ResolvedRuntimeProvider) -> dict[str, 
         return {
             "provider_source": "legacy_profile",
             "provider_profile_id": str(provider.legacy_profile.id),
+            "profile_key": provider.legacy_profile.profile_key,
             "provider_key": provider.legacy_profile.profile_key,
             "provider_type": provider.legacy_profile.provider_type.value,
         }
