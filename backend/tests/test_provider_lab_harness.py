@@ -153,6 +153,11 @@ def test_provider_lab_templates_cover_required_presets_without_forced_vendor_url
         )
         assert template.base_url_placeholder != ""
         assert "api_key" not in str(template.config_json).lower()
+    assert templates["mimo-v2-5-asr"].config_json == {
+        "endpoint": "/v1/chat/completions",
+        "request_format": "chat_completions",
+        "model_discovery_path": "/v1/models",
+    }
 
 
 def test_provider_lab_model_discovery_uses_static_models_and_manual_fallback() -> None:
@@ -483,6 +488,12 @@ def test_provider_lab_real_mimo_asr_smoke_is_opt_in_safe(tmp_path: Path) -> None
     storage = LocalMediaObjectStorage(tmp_path / "objects")
 
     with Session(engine) as session:
+        provider_config: dict[str, object] = {
+            "endpoint": config["mimo_asr_endpoint"] or "/v1/chat/completions",
+            "timeout_seconds": float(config["mimo_asr_timeout_seconds"] or "60"),
+        }
+        if config["mimo_asr_request_format"]:
+            provider_config["request_format"] = config["mimo_asr_request_format"]
         provider = ProviderRegistryService(session).create_provider(
             ProviderIntegrationCreate(
                 world_id=world_id,
@@ -493,10 +504,7 @@ def test_provider_lab_real_mimo_asr_smoke_is_opt_in_safe(tmp_path: Path) -> None
                 display_name="Real MiMO ASR Smoke",
                 base_url=config["mimo_base_url"],
                 auth_ref=config["mimo_asr_auth_ref"],
-                config_json={
-                    "endpoint": config["mimo_asr_endpoint"] or "/asr",
-                    "timeout_seconds": float(config["mimo_asr_timeout_seconds"] or "60"),
-                },
+                config_json=provider_config,
                 default_params_json={"model": config["mimo_asr_model"]},
                 capabilities=(
                     ProviderCapabilityCreate(
@@ -569,6 +577,9 @@ def _real_mimo_asr_config() -> dict[str, str | None]:
         "mimo_asr_auth_ref": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_AUTH_REF"),
         "mimo_asr_model": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_MODEL"),
         "mimo_asr_endpoint": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_ENDPOINT"),
+        "mimo_asr_request_format": os.getenv(
+            "NOVELAND_PROVIDER_LAB_MIMO_ASR_REQUEST_FORMAT"
+        ),
         "mimo_asr_language": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_LANGUAGE"),
         "mimo_asr_audio_path": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_AUDIO_PATH"),
         "mimo_asr_timeout_seconds": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_TIMEOUT_SECONDS"),

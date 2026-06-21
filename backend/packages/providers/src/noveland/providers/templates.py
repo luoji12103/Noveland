@@ -78,9 +78,13 @@ def provider_templates() -> list[ProviderTemplateRead]:
             base_url_placeholder="https://gateway.example",
             model_name_placeholder="mimo-asr-model",
             auth_ref_placeholder="env:MIMO_API_KEY",
-            config_json={"endpoint": "/asr", "model_discovery_path": "/models"},
+            config_json={
+                "endpoint": "/v1/chat/completions",
+                "request_format": "chat_completions",
+                "model_discovery_path": "/v1/models",
+            },
             capabilities=(_cap("speech.asr", model_discovery=True),),
-            model_discovery={"strategy": "generic_models", "path": "/models"},
+            model_discovery={"strategy": "generic_models", "path": "/v1/models"},
         ),
         ProviderTemplateRead(
             template_key="z-image",

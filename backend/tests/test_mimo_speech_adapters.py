@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import cast
 
@@ -81,6 +82,60 @@ def test_mimo_asr_adapter_maps_audio_request(monkeypatch: pytest.MonkeyPatch) ->
     body = cast(bytes, captured["body"])
     assert b"source.wav" in body
     assert b"mimo-v2.5-asr" in body
+    assert result.output_text == "recognized"
+
+
+def test_mimo_asr_adapter_maps_chat_completions_audio_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["authorization"] = request.headers["authorization"]
+        captured["content_type"] = request.headers["content-type"]
+        try:
+            captured["json"] = json.loads(request.content)
+        except json.JSONDecodeError:
+            return httpx.Response(418, json={"error": "expected JSON payload"})
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "recognized"}}]},
+        )
+
+    monkeypatch.setattr(httpx, "Client", _client_factory(handler))
+
+    result = MiMOASRAdapter().execute(
+        base_url="https://mimo.example.test",
+        auth_ref="mimo-secret",
+        config_json={
+            "endpoint": "/v1/chat/completions",
+            "request_format": "chat_completions",
+        },
+        default_params_json={"model": "mimo-v2.5-asr"},
+        input_text=None,
+        input_json={},
+        request_json={"language": "ja"},
+        media_inputs=[
+            SpeechAdapterInput(
+                filename="source.wav",
+                data=b"wav",
+                mime_type="audio/wav",
+            )
+        ],
+    )
+
+    assert captured["url"] == "https://mimo.example.test/v1/chat/completions"
+    assert captured["authorization"] == "Bearer mimo-secret"
+    assert str(captured["content_type"]).startswith("application/json")
+    body = cast(dict[str, object], captured["json"])
+    assert body["model"] == "mimo-v2.5-asr"
+    assert body["asr_options"] == {"language": "ja"}
+    messages = cast(list[dict[str, object]], body["messages"])
+    content = cast(list[dict[str, object]], messages[0]["content"])
+    audio = cast(dict[str, str], content[0]["input_audio"])
+    assert content[0]["type"] == "input_audio"
+    assert audio["data"] == "data:audio/wav;base64,d2F2"
     assert result.output_text == "recognized"
 
 
