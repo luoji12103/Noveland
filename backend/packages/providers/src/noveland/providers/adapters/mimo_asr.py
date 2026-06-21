@@ -49,7 +49,7 @@ class MiMOASRAdapter:
                 files={"file": (audio.filename, audio.data, audio.mime_type)},
             )
         response.raise_for_status()
-        raw = response.json()
+        raw = _response_payload(response)
         text = raw.get("text") or raw.get("transcript") or raw.get("transcript_text")
         transcript = str(text or "")
         return SpeechAdapterResult(
@@ -63,3 +63,18 @@ def _speech_inputs(value: object) -> list[SpeechAdapterInput]:
     if isinstance(value, list) and all(isinstance(item, SpeechAdapterInput) for item in value):
         return value
     return []
+
+
+def _response_payload(response: httpx.Response) -> dict[str, Any]:
+    try:
+        raw = response.json()
+    except ValueError:
+        return {
+            "transcript_text": response.text.strip(),
+            "content_type": response.headers.get("content-type"),
+        }
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        return {"transcript_text": raw}
+    return {"transcript_text": ""}

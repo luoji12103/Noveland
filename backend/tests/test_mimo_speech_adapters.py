@@ -84,6 +84,39 @@ def test_mimo_asr_adapter_maps_audio_request(monkeypatch: pytest.MonkeyPatch) ->
     assert result.output_text == "recognized"
 
 
+def test_mimo_asr_adapter_accepts_plain_text_transcript_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            text="plain transcript",
+            headers={"content-type": "text/plain"},
+        )
+
+    monkeypatch.setattr(httpx, "Client", _client_factory(handler))
+
+    result = MiMOASRAdapter().execute(
+        base_url="https://mimo.example.test",
+        auth_ref="mimo-secret",
+        config_json={"endpoint": "/v2.5/asr"},
+        default_params_json={"model": "mimo-v2.5-asr"},
+        input_text=None,
+        input_json={},
+        request_json={"language": "ja"},
+        media_inputs=[
+            SpeechAdapterInput(
+                filename="source.wav",
+                data=b"wav",
+                mime_type="audio/wav",
+            )
+        ],
+    )
+
+    assert result.output_text == "plain transcript"
+    assert result.output_json == {"transcript_text": "plain transcript"}
+
+
 @pytest.mark.parametrize(
     "adapter",
     [
