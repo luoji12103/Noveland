@@ -19,6 +19,16 @@ from noveland.invocations.models import (
     PromptSnapshot,
     PromptTemplate,
 )
+from noveland.media.contracts import (
+    MediaAssetCreate,
+    MediaAssetKind,
+    MediaAssetRole,
+    MediaAssetStatus,
+    MediaObjectCreate,
+    MediaObjectRole,
+    MediaSourceKind,
+    MediaVisibility,
+)
 from noveland.media.models import (
     MediaAsset,
     MediaAssetCollection,
@@ -30,6 +40,7 @@ from noveland.media.models import (
     MediaObject,
     MediaReference,
 )
+from noveland.media.service import MediaService
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
 from noveland.providers.contracts import (
@@ -447,11 +458,120 @@ def test_provider_lab_real_provider_examples_require_explicit_opt_in() -> None:
     assert "base_url" not in evidence
 
 
+@pytest.mark.real_provider
+@pytest.mark.skipif(
+    not RUN_REAL_PROVIDER_TESTS,
+    reason="requires NOVELAND_RUN_REAL_PROVIDER_TESTS=1",
+)
+def test_provider_lab_real_mimo_asr_smoke_is_opt_in_safe(tmp_path: Path) -> None:
+    config = _real_mimo_asr_config()
+    required_keys = (
+        "mimo_base_url",
+        "mimo_asr_auth_ref",
+        "mimo_asr_model",
+        "mimo_asr_audio_path",
+    )
+    missing = [name for name in required_keys if not config[name]]
+    if missing:
+        pytest.skip(f"MiMO ASR provider lab env not configured: {', '.join(sorted(missing))}")
+    audio_path = Path(str(config["mimo_asr_audio_path"]))
+    if not audio_path.is_file():
+        pytest.skip("MiMO ASR provider lab audio path is not a file")
+
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    storage = LocalMediaObjectStorage(tmp_path / "objects")
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.SPEECH_TO_TEXT,
+                adapter_kind=ProviderAdapterKind.MIMO_ASR,
+                provider_key="real-mimo-asr-smoke",
+                display_name="Real MiMO ASR Smoke",
+                base_url=config["mimo_base_url"],
+                auth_ref=config["mimo_asr_auth_ref"],
+                config_json={
+                    "endpoint": config["mimo_asr_endpoint"] or "/asr",
+                    "timeout_seconds": float(config["mimo_asr_timeout_seconds"] or "60"),
+                },
+                default_params_json={"model": config["mimo_asr_model"]},
+                capabilities=(
+                    ProviderCapabilityCreate(
+                        capability_key="speech.asr",
+                        capability_json={"value": True},
+                    ),
+                ),
+            )
+        )
+        source_asset_id = _seed_audio_asset_from_path(
+            session,
+            storage,
+            world_id,
+            worldline_id,
+            audio_path,
+        )
+        result = ProviderExecutionService(session, storage).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider.id,
+                provider_kind=ProviderKind.SPEECH_TO_TEXT,
+                capability_key="speech.asr",
+                request_json={
+                    "operation": "stt",
+                    "input_asset_ids": [str(source_asset_id)],
+                    "language": config["mimo_asr_language"],
+                },
+                media_asset_id=source_asset_id,
+                actor_ref="test:provider-lab-real-mimo-asr",
+            )
+        )
+        evidence = _safe_provider_lab_evidence(
+            provider_family="mimo",
+            provider_kind=ProviderKind.SPEECH_TO_TEXT,
+            adapter_kind=ProviderAdapterKind.MIMO_ASR,
+            capability_key="speech.asr",
+            model_name=config["mimo_asr_model"],
+            status=result.invocation.status,
+            error_class=None,
+        )
+        session.commit()
+
+    assert result.invocation.status == "succeeded"
+    assert result.output_text is not None
+    assert evidence == {
+        "provider_family": "mimo",
+        "provider_kind": "speech_to_text",
+        "adapter_kind": "mimo_asr",
+        "capability_key": "speech.asr",
+        "model_name": config["mimo_asr_model"],
+        "status": "succeeded",
+        "error_class": None,
+    }
+    assert "auth_ref" not in evidence
+    assert "base_url" not in evidence
+
+
 def _real_provider_lab_config() -> dict[str, str | None]:
     return {
         "openai_base_url": os.getenv("NOVELAND_PROVIDER_LAB_OPENAI_BASE_URL"),
         "openai_auth_ref": os.getenv("NOVELAND_PROVIDER_LAB_OPENAI_AUTH_REF"),
         "openai_model": os.getenv("NOVELAND_PROVIDER_LAB_OPENAI_MODEL"),
+    }
+
+
+def _real_mimo_asr_config() -> dict[str, str | None]:
+    return {
+        "mimo_base_url": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_BASE_URL"),
+        "mimo_asr_auth_ref": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_AUTH_REF"),
+        "mimo_asr_model": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_MODEL"),
+        "mimo_asr_endpoint": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_ENDPOINT"),
+        "mimo_asr_language": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_LANGUAGE"),
+        "mimo_asr_audio_path": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_AUDIO_PATH"),
+        "mimo_asr_timeout_seconds": os.getenv("NOVELAND_PROVIDER_LAB_MIMO_ASR_TIMEOUT_SECONDS"),
     }
 
 
@@ -562,6 +682,70 @@ def _seed_provider(
         )
     )
     return provider.id
+
+
+def _seed_audio_asset_from_path(
+    session: Session,
+    storage: LocalMediaObjectStorage,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    audio_path: Path,
+) -> uuid.UUID:
+    data = audio_path.read_bytes()
+    content_type = _audio_mime_type(audio_path)
+    stored = storage.write_bytes(
+        f"worlds/{world_id}/worldlines/{worldline_id}/provider-lab/{audio_path.name}",
+        data,
+        content_type=content_type,
+    )
+    asset = MediaService(session, storage).create_asset(
+        MediaAssetCreate(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            asset_kind=MediaAssetKind.AUDIO,
+            asset_role=MediaAssetRole.TRANSCRIPT_AUDIO,
+            source_kind=MediaSourceKind.TEST_FIXTURE,
+            status=MediaAssetStatus.AVAILABLE,
+            visibility=MediaVisibility.WORLD_ADMIN,
+            filename=audio_path.name,
+            storage_uri=stored.uri,
+            mime_type=content_type,
+            file_ext=audio_path.suffix.removeprefix(".") or "wav",
+            size_bytes=stored.size_bytes,
+            checksum_sha256=stored.checksum_sha256,
+        ),
+        actor_ref="test:provider-lab-real-mimo-asr",
+    )
+    MediaService(session, storage).add_object(
+        world_id,
+        asset.id,
+        MediaObjectCreate(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            object_role=MediaObjectRole.ORIGINAL,
+            storage_uri=stored.uri,
+            filename=audio_path.name,
+            mime_type=content_type,
+            size_bytes=stored.size_bytes,
+            checksum_sha256=stored.checksum_sha256,
+        ),
+    )
+    return asset.id
+
+
+def _audio_mime_type(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix == ".mp3":
+        return "audio/mpeg"
+    if suffix == ".flac":
+        return "audio/flac"
+    if suffix == ".ogg":
+        return "audio/ogg"
+    if suffix == ".webm":
+        return "audio/webm"
+    if suffix == ".aac":
+        return "audio/aac"
+    return "audio/wav"
 
 
 @pytest.fixture(autouse=True)
